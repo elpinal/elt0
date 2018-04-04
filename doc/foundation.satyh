@@ -1,6 +1,16 @@
 @require: stdja
 
 module Foundation : sig
+  type machine
+  type regfile
+  type register
+  type instruction
+
+  val inst : (math * math list) -> instruction
+  val machine : regfile -> machine
+
+  val display-instruction : instruction -> math
+
   direct \double-quotes : [inline-text] inline-cmd
   direct \iota : [] math-cmd
   direct \nu : [] math-cmd
@@ -19,6 +29,20 @@ module Foundation : sig
   direct +pr : [inline-text] block-cmd
   direct +BNF : [string; context -> block-boxes] block-cmd
 end = struct
+
+  type register = int
+  type regfile = (register * int) list
+  type machine = regfile
+  type instruction = math * math list
+
+  let inst x = x
+  let machine rf = rf
+
+  let-math \inst m = ${\mathrm{#m}}
+
+  let display-instruction (opname, ms) =
+    let m = ms |> Math.concat ${\ } in
+      ${\inst{#opname} \ #m}
 
   let-inline ctx \double-quotes it =
     let left = embed-string `“` in
@@ -44,8 +68,6 @@ end = struct
 
   let-math \iota = greek-lowercase 0x1D704 0x1D73E
   let-math \nu = greek-lowercase 0x1D708 0x1D742
-
-  let-math \inst m = ${\mathrm{#m}}
 
   let-math \vbar-rel = text-in-math MathBin (fun ctx -> read-inline ctx {\|})
 
