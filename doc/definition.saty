@@ -27,42 +27,46 @@ StdJa.document (|
       Its syntax is given in Figure 1.
     }
 
-    +BNF (`Instructions and operands`) (fun ctx -> (
-      let whole =
-        [ (| desc = {registers:}
-           ; metavar = ${r}
-           ; list = [ (`general-purpose registers`, ${\r{1} \| \r{2} \| ... \| \r{k}})
-                    ]
-          |)
-        ; (| desc = {operands:}
-           ; metavar = ${\nu}
-           ; list = [ (`register`, ${r})
-                    ; (`integer`, ${i})
-                    ]
-          |)
-        ; (| desc = {instructions:}
-           ; metavar = ${\iota}
-           ; list = [ (`move`, ${\inst{mov} \ r \ \nu})
-                    ; (`add`, ${\inst{add} \ r \ \nu \ \nu})
-                    ; (`subtract`, ${\inst{sub} \ r \ \nu \ \nu})
-                    ; (`logical and`, ${\inst{and} \ r \ \nu \ \nu})
-                    ; (`logical or`, ${\inst{or} \ r \ \nu \ \nu})
-                    ; (`logical not`, ${\inst{not} \ r \ \nu})
-                    ; (`logical shift left`, ${\inst{shl} \ r \ \nu \ \nu})
-                    ; (`logical shift right`, ${\inst{shr} \ r \ \nu \ \nu})
-                    ]
-          |)
-        ]
-      in
-      let f = (fun set -> (
-        let desc = read-inline ctx set#desc in
-        let metavar = set#metavar in
-        let list = Foundation.lines ctx set#list in
-        let ib = embed-math ctx metavar ++ (read-inline ctx {::=} |> Foundation.wrap-with-space 3pt) ++ inline-fil ++ desc in
-        let bb = Foundation.make-block-from-lines ctx (ib :: list) in
-          bb
-      ))
-      in List.map f whole |> List.fold-left (+++) block-nil
-    ));
+    +BNF (`Instructions and operands`) (fun ctx0 ->
+      block-frame-breakable ctx0 (10pt, 10pt, 10pt, 10pt) Foundation.frame
+        (fun ctx -> (
+          let whole =
+            [ (| desc = {registers:}
+               ; metavar = ${r}
+               ; list = [ (`general-purpose registers`, ${\r{1} \| \r{2} \| ... \| \r{k}})
+                        ]
+              |)
+            ; (| desc = {operands:}
+               ; metavar = ${\nu}
+               ; list = [ (`register`, ${r})
+                        ; (`integer`, ${i})
+                        ]
+              |)
+            ; (| desc = {instructions:}
+               ; metavar = ${\iota}
+               ; list = [ (`move`, ${\inst{mov} \ r \ \nu})
+                        ; (`add`, ${\inst{add} \ r \ \nu \ \nu})
+                        ; (`subtract`, ${\inst{sub} \ r \ \nu \ \nu})
+                        ; (`logical and`, ${\inst{and} \ r \ \nu \ \nu})
+                        ; (`logical or`, ${\inst{or} \ r \ \nu \ \nu})
+                        ; (`logical not`, ${\inst{not} \ r \ \nu})
+                        ; (`logical shift left`, ${\inst{shl} \ r \ \nu \ \nu})
+                        ; (`logical shift right`, ${\inst{shr} \ r \ \nu \ \nu})
+                        ]
+              |)
+            ]
+          in
+          let f = (fun set -> (
+            let desc = read-inline ctx set#desc in
+            let metavar = set#metavar in
+            let list = Foundation.lines ctx set#list in
+            let ib = embed-math ctx metavar ++ (read-inline ctx {::=} |> Foundation.wrap-with-space 3pt) ++ inline-fil ++ desc in
+            let bb = Foundation.make-block-from-lines ctx (ib :: list) in
+              bb
+          ))
+          in
+            List.map f whole |> List.fold-left (+++) block-nil
+        ))
+    );
   >
 >

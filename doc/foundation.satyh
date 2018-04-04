@@ -14,6 +14,8 @@ module Foundation : sig
   val wrap-with-space : length -> inline-boxes -> inline-boxes
   val make-block-from-lines : context -> inline-boxes list -> block-boxes
 
+  val frame : deco-set
+
   direct +pr : [inline-text] block-cmd
   direct +BNF : [string; context -> block-boxes] block-cmd
 end = struct
@@ -67,6 +69,26 @@ end = struct
     in
       List.fold-left (+++) block-nil bbs
 
+  let frame =
+    let strokef = stroke 1pt Color.black in
+    let extra = 4pt in
+    let decoS (x, y) w h d =
+      [ start-path (x, y +' h -' extra)
+        |> line-to (x, y +' h)
+        |> line-to (x +' w, y +' h)
+        |> line-to (x +' w, y +' h -' extra)
+        |> terminate-path
+        |> strokef
+      ; start-path (x, y -' d +' extra)
+        |> line-to (x, y -' d)
+        |> line-to (x +' w, y -' d)
+        |> line-to (x +' w, y -' d +' extra)
+        |> terminate-path
+        |> strokef
+      ]
+    in
+    (decoS, decoS, decoS, decoS)
+
   let-block ctx +pr bt =
     let ctx = ctx
       % |> set-font-size 14pt
@@ -85,5 +107,5 @@ end = struct
       |> read-inline ctx
       |> line-break true true ctx
     in
-      bbt +++ bbf ctx
+      bbf ctx +++ bbt
 end
