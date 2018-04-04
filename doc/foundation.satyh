@@ -1,0 +1,89 @@
+@require: stdja
+
+module Foundation : sig
+  direct \double-quotes : [inline-text] inline-cmd
+  direct \iota : [] math-cmd
+  direct \nu : [] math-cmd
+  direct \inst : [math] math-cmd
+
+  direct \vbar-rel : [] math-cmd
+
+  direct \r : [math] math-cmd
+
+  val lines : context -> (string * math) list -> inline-boxes list
+  val wrap-with-space : length -> inline-boxes -> inline-boxes
+  val make-block-from-lines : context -> inline-boxes list -> block-boxes
+
+  direct +pr : [inline-text] block-cmd
+  direct +BNF : [string; context -> block-boxes] block-cmd
+end = struct
+
+  let-inline ctx \double-quotes it =
+    let left = embed-string `“` in
+    let right = embed-string `”` in
+      read-inline ctx {#left;#it;#right;}
+
+  let single cp = string-unexplode [cp]
+
+  let greek-lowercase cp cpb =
+    let s = single cp in
+    let sb = single cpb in
+      math-variant-char MathOrd (|
+        italic        = s;
+        bold-italic   = sb;
+        roman         = s;
+        bold-roman    = sb;
+        script        = s;
+        bold-script   = sb;
+        fraktur       = s;
+        bold-fraktur  = sb;
+        double-struck = s;
+      |)
+
+  let-math \iota = greek-lowercase 0x1D704 0x1D73E
+  let-math \nu = greek-lowercase 0x1D708 0x1D742
+
+  let-math \inst m = ${\mathrm{#m}}
+
+  let-math \vbar-rel = text-in-math MathBin (fun ctx -> read-inline ctx {\|})
+
+  let-math \r x = ${\mathrm{r} #x}
+
+  let lines ctx l =
+    let ms = List.map (fun (s, m) -> (
+      let it = embed-string s in
+        inline-skip 40pt ++ embed-math ctx m ++ inline-fil ++ read-inline ctx it
+    )) l in
+      ms
+
+  let wrap-with-space l ib =
+    inline-skip l ++ ib ++ inline-skip l
+
+  let make-block-from-lines ctx l =
+    let bbs =
+      List.map (fun x -> (
+        line-break true true ctx x
+      )) l
+    in
+      List.fold-left (+++) block-nil bbs
+
+  let-block ctx +pr bt =
+    let ctx = ctx
+      % |> set-font-size 14pt
+      % |> set-leading 18pt
+    in
+      read-block ctx '<+p {#bt;}>
+
+  let-mutable bnf-number-ref <- 0
+
+  let-block ctx +BNF title bbf =
+    let () = bnf-number-ref <- !bnf-number-ref + 1 in
+    let n = arabic (!bnf-number-ref) |> embed-string in
+    let bbt = title
+      |> embed-string
+      |> (fun it -> {Figure #n;: #it;})
+      |> read-inline ctx
+      |> line-break true true ctx
+    in
+      bbt +++ bbf ctx
+end
