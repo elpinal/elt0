@@ -5,9 +5,10 @@ module Foundation : sig
   type regfile
   type register
   type instruction
+  type seq
 
   val inst : (math * math list) -> instruction
-  val machine : regfile -> machine
+  val machine : (regfile * seq) -> machine
 
   val display-instruction : instruction -> math
 
@@ -32,11 +33,34 @@ end = struct
 
   type register = int
   type regfile = (register * int) list
-  type machine = regfile
   type instruction = math * math list
+  type seq = instruction list
+  type machine = regfile * seq
+
+  type cond =
+    | Eq
+  type eval-axiom = machine * machine
+  type eval-rule = cond list * eval-axiom
+
+  let display-cond c =
+    match c with
+      | Eq -> ${=}
+
+  let display-machine (rf, s) =
+    ${\paren{#rf, #s}}
+
+  let display-eval-axiom (m1, m2) =
+    let m1 = display-machine m1 in
+    let m2 = display-machine m2 in
+      ${m1 \to m2}
+
+  let display-eval-rule (cs, ea) =
+    let ms = List.map display-cond cs |> Math.concat ${--} in
+    let m = display-eval-axiom ea in
+      ${#ms #m}
 
   let inst x = x
-  let machine rf = rf
+  let machine x = x
 
   let-math \inst m = ${\mathrm{#m}}
 

@@ -2,6 +2,9 @@
 @require: stdja
 @import: foundation
 
+let inst = Foundation.inst in
+let display-instruction = Foundation.display-instruction in
+
 StdJa.document (|
   title = {ELT0};
   author = {El Pin Al};
@@ -30,6 +33,8 @@ StdJa.document (|
     +BNF (`Instructions and operands`) (fun ctx0 ->
       block-frame-breakable ctx0 (10pt, 10pt, 10pt, 10pt) Foundation.frame
         (fun ctx -> (
+          let display p = inst p |> display-instruction in
+          let-math \semi-rel = text-in-math MathBin (fun ctx -> read-inline ctx {\;}) in
           let whole =
             [ (| desc = {registers:}
                ; metavar = ${r}
@@ -44,14 +49,19 @@ StdJa.document (|
               |)
             ; (| desc = {instructions:}
                ; metavar = ${\iota}
-               ; list = [ (`move`, ${\inst{mov} \ r \ \nu})
-                        ; (`add`, ${\inst{add} \ r \ \nu \ \nu})
-                        ; (`subtract`, ${\inst{sub} \ r \ \nu \ \nu})
-                        ; (`logical and`, ${\inst{and} \ r \ \nu \ \nu})
-                        ; (`logical or`, ${\inst{or} \ r \ \nu \ \nu})
-                        ; (`logical not`, ${\inst{not} \ r \ \nu})
-                        ; (`logical shift left`, ${\inst{shl} \ r \ \nu \ \nu})
-                        ; (`logical shift right`, ${\inst{shr} \ r \ \nu \ \nu})
+               ; list = [ (`move`               , display (${mov}, [${r}; ${\nu};       ]))
+                        ; (`add`                , display (${add}, [${r}; ${\nu}; ${\nu}]))
+                        ; (`subtract`           , display (${sub}, [${r}; ${\nu}; ${\nu}]))
+                        ; (`logical and`        , display (${and}, [${r}; ${\nu}; ${\nu}]))
+                        ; (`logical or`         , display (${or} , [${r}; ${\nu}; ${\nu}]))
+                        ; (`logical not`        , display (${not}, [${r}; ${\nu};       ]))
+                        ; (`logical shift left` , display (${shl}, [${r}; ${\nu}; ${\nu}]))
+                        ; (`logical shift right`, display (${shr}, [${r}; ${\nu}; ${\nu}]))
+                        ]
+              |)
+            ; (| desc = {instruction sequences:}
+               ; metavar = ${I}
+               ; list = [ (`instructions`, ${\iota \semi-rel ... \semi-rel \iota})
                         ]
               |)
             ]
@@ -68,5 +78,31 @@ StdJa.document (|
             List.map f whole |> List.fold-left (+++) block-nil
         ))
     );
+
+    +pr {
+      Its evaluation rules are given in Figure 2.
+    }
+
+    % +BNF (`Evaluation rules`) (fun ctx0 ->
+    %   block-frame-breakable ctx0 (10pt, 10pt, 10pt, 10pt) Foundation.frame
+    %     (fun ctx -> (
+    %       let whole =
+    %         [ (| ident = {E-Machine}
+    %            ; rule = ([${}], ${})
+    %           |)
+    %         ]
+    %       in
+    %       let f = (fun set -> (
+    %         let ident = read-inline ctx set#ident in
+    %         let rule = Foundation.rule ctx set#rule in
+    %         let ib = (read-inline ctx {::=} |> Foundation.wrap-with-space 3pt) ++ inline-fil ++ ident in
+    %         let bb = Foundation.make-block-from-lines ctx (ib :: rule) in
+    %           bb
+    %       ))
+    %       in
+    %         List.map f whole |> List.fold-left (+++) block-nil
+    %     ))
+    % );
+
   >
 >
