@@ -1,1 +1,5 @@
 *.satysfi-aux
+
+/target/
+**/*.rs.bk
+Cargo.lock

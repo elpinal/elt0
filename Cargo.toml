@@ -1,0 +1,6 @@
+[package]
+name = "elt0"
+version = "0.1.0"
+authors = ["elpinal <elpinal@users.noreply.github.com>"]
+
+[dependencies]
