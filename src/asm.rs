@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 use std::collections::HashMap;
+use std::ops::{BitAnd, BitOr, Not, Shl, Shr};
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 struct Register(usize);
@@ -50,7 +51,47 @@ impl Machine {
                     let v = self.right_value(o).clone();
                     self.file.insert(r.clone(), v);
                 }
-                _ => unimplemented!(),
+                Add(ref r, ref o1, ref o2) => {
+                    let v1 = self.right_value(o1).clone();
+                    let v2 = self.right_value(o2).clone();
+                    let (v, _) = v1.overflowing_add(&v2);
+                    self.file.insert(r.clone(), v);
+                }
+                Sub(ref r, ref o1, ref o2) => {
+                    let v1 = self.right_value(o1).clone();
+                    let v2 = self.right_value(o2).clone();
+                    let (v, _) = v1.overflowing_sub(&v2);
+                    self.file.insert(r.clone(), v);
+                }
+                And(ref r, ref o1, ref o2) => {
+                    let v1 = self.right_value(o1).clone();
+                    let v2 = self.right_value(o2).clone();
+                    let v = v1 & v2;
+                    self.file.insert(r.clone(), v);
+                }
+                Or(ref r, ref o1, ref o2) => {
+                    let v1 = self.right_value(o1).clone();
+                    let v2 = self.right_value(o2).clone();
+                    let v = v1 | v2;
+                    self.file.insert(r.clone(), v);
+                }
+                Not(ref r, ref o) => {
+                    let v = self.right_value(o).clone();
+                    let v = !v;
+                    self.file.insert(r.clone(), v);
+                }
+                Shl(ref r, ref o1, ref o2) => {
+                    let v1 = self.right_value(o1).clone();
+                    let v2 = self.right_value(o2).clone();
+                    let v = v1 << v2;
+                    self.file.insert(r.clone(), v);
+                }
+                Shr(ref r, ref o1, ref o2) => {
+                    let v1 = self.right_value(o1).clone();
+                    let v2 = self.right_value(o2).clone();
+                    let v = v1 >> v2;
+                    self.file.insert(r.clone(), v);
+                }
             }
         }
     }
@@ -73,6 +114,71 @@ impl File {
         self.0
             .get(r)
             .expect(&format!("missing content in register {:?}", r))
+    }
+}
+
+impl BitAnd for Value {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self {
+        let Value::Word(w1) = self;
+        let Value::Word(w2) = rhs;
+        Value::Word(w1 & w2)
+    }
+}
+
+impl BitOr for Value {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self {
+        let Value::Word(w1) = self;
+        let Value::Word(w2) = rhs;
+        Value::Word(w1 | w2)
+    }
+}
+
+impl Not for Value {
+    type Output = Self;
+
+    fn not(self) -> Self {
+        let Value::Word(w1) = self;
+        Value::Word(!w1)
+    }
+}
+
+impl Shl<Value> for Value {
+    type Output = Self;
+
+    fn shl(self, rhs: Self) -> Self {
+        let Value::Word(w1) = self;
+        let Value::Word(w2) = rhs;
+        Value::Word(w1 << w2)
+    }
+}
+
+impl Shr<Value> for Value {
+    type Output = Self;
+
+    fn shr(self, rhs: Self) -> Self {
+        let Value::Word(w1) = self;
+        let Value::Word(w2) = rhs;
+        Value::Word(w1 >> w2)
+    }
+}
+
+impl Value {
+    fn overflowing_add(&self, rhs: &Value) -> (Value, bool) {
+        let Value::Word(w1) = *self;
+        let Value::Word(w2) = *rhs;
+        let (w, overflow) = w1.overflowing_add(w2);
+        (Value::Word(w), overflow)
+    }
+
+    fn overflowing_sub(&self, rhs: &Value) -> (Value, bool) {
+        let Value::Word(w1) = *self;
+        let Value::Word(w2) = *rhs;
+        let (w, overflow) = w1.overflowing_sub(w2);
+        (Value::Word(w), overflow)
     }
 }
 
