@@ -21,6 +21,21 @@ enum LexError {
 
 struct Cont<R>(Lex, Bytes<R>);
 
+fn is_alphabet(b: u8) -> bool {
+    match b {
+        b'a'...b'z' | b'A'...b'Z' => true,
+        _ => false,
+    }
+}
+
+fn is_alphanum(b: u8) -> bool {
+    match b {
+        _ if is_digit(b) => true,
+        _ if is_alphabet(b) => true,
+        _ => false,
+    }
+}
+
 fn is_whitespace(b: u8) -> bool {
     match b {
         b' ' | b'\n' => true,
@@ -65,6 +80,10 @@ impl<R: Read> Lexer<R> {
             Some(Err(e)) => Cont(Lex::Error(LexError::from(e)), src),
             Some(Ok(b)) => Cont(Lex::Lexed(b), src),
         }
+    }
+
+    fn reads_alphanum(src: Bytes<R>, v: &mut Vec<u8>) -> Cont<R> {
+        Lexer::repeat(src, |src| Lexer::read_with_condition(src, is_alphanum), v)
     }
 
     fn read_with_condition<F>(src: Bytes<R>, f: F) -> Cont<R>
