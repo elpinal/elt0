@@ -3,3 +3,7 @@
 /target/
 **/*.rs.bk
 Cargo.lock
+
+/haskell/**/.stack-work/
+/haskell/**/elt0.cabal
+/haskell/**/*~
