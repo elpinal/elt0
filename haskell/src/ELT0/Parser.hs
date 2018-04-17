@@ -2,6 +2,7 @@ module ELT0.Parser
   ( mainParser
   , run
   , insts
+  , inst
   , operand
   , reg
   , Inst(..)
@@ -76,7 +77,7 @@ word32 :: Parser Word32
 word32 = fromInteger . toInteger <$> dec
 
 val :: Parser Val
-val = Word <$> word32
+val = Word <$> word32 <?> "value"
 
 ident :: Parser String
 ident = identifier lexer
@@ -121,7 +122,7 @@ insts :: Parser [Inst]
 insts = inst `sepEndBy` instSep
 
 mainParser :: String -> Either ParseError [Inst]
-mainParser = run insts
+mainParser = run $ insts <* eof
 
 run :: Parser a -> String -> Either ParseError a
 run p = parse p "<filename>"

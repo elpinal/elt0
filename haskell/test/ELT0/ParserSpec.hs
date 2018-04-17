@@ -28,6 +28,12 @@ spec = do
       mainParser "not R1 128 ; not R8 7" `shouldBe` return [Reg 1 `Not` word 128, Reg 8 `Not` word 7]
       mainParser "mov R1 128 ; mov R8 7" `shouldBe` return [Reg 1 `Mov` word 128, Reg 8 `Mov` word 7]
 
+      -- mainParser "mov R1 128 \n mov R8 7" `shouldBe` return [Reg 1 `Mov` word 128, Reg 8 `Mov` word 7]
+
+      mainParser "mov"          `shouldSatisfy` isLeft
+      mainParser "mov R0 R1 ;;" `shouldSatisfy` isLeft
+      mainParser "mov ; R0 R1"  `shouldSatisfy` isLeft
+
   describe "reg" $
     it "parses a register" $ do
       run reg "R0"          `shouldBe` return (Reg 0)
@@ -78,3 +84,14 @@ spec = do
       run operand "a"  `shouldSatisfy` isLeft
       run operand ""   `shouldSatisfy` isLeft
       run operand " 0" `shouldSatisfy` isLeft
+
+  describe "inst" $
+    it "parses an instruction" $ do
+      let reg = Register . Reg
+      let word = Value . Word
+
+      run inst "mov R0 R1" `shouldBe` return (Reg 0 `Mov` reg 1)
+
+      run inst "movR0 R1" `shouldSatisfy` isLeft
+      run inst "mov R0"   `shouldSatisfy` isLeft
+      run inst "mov"      `shouldSatisfy` isLeft
