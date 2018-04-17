@@ -66,13 +66,11 @@ digitInteger = toInteger . digitToInt <$> digit
 dec :: Parser Integer
 dec = do
   n <- digitInteger
-  case n of
-    0 -> notFollowedBy digit >> whiteSpace lexer $> 0
-    _ -> do
-      ns <- many digitInteger
-      notFollowedBy alphaNum
-      whiteSpace lexer
-      return $ foldl (\a n -> a*10 + n) n ns
+  f n <* notFollowedBy alphaNum <* whiteSpace lexer
+  where
+    f :: Integer -> Parser Integer
+    f 0 = return 0
+    f n = foldl (\a n -> a*10 + n) n <$> many digitInteger
 
 word32 :: Parser Word32
 word32 = fromInteger . toInteger <$> dec
