@@ -5,6 +5,7 @@ import Test.Hspec
 import Data.Either
 
 import ELT0.Parser
+import ELT0.Program
 
 spec :: Spec
 spec = do
