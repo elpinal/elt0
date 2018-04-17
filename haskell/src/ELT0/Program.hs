@@ -4,6 +4,7 @@ module ELT0.Program
   , Reg(..)
   , Operand(..)
   , Val(..)
+  , Display(..)
   ) where
 
 import Data.Word
