@@ -20,6 +20,7 @@ description:         Please see the README on Github at <https://github.com/elpi
 
 dependencies:
 - base >= 4.7 && < 5
+- parsec >= 3.1.13.0
 
 library:
   source-dirs: src
@@ -45,3 +46,4 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - elt0
+    - hspec
