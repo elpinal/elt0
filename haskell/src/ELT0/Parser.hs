@@ -12,6 +12,7 @@ module ELT0.Parser
   ) where
 
 import Text.Parsec
+import Text.Parsec.Char
 import Text.Parsec.Language
 import Text.Parsec.String
 import Text.Parsec.Token
@@ -63,10 +64,13 @@ lexer = makeTokenParser def
 digitInteger :: Parser Integer
 digitInteger = toInteger . digitToInt <$> digit
 
+skipSpaces :: Parser ()
+skipSpaces = skipMany $ char ' '
+
 dec :: Parser Integer
 dec = do
   n <- digitInteger
-  f n <* notFollowedBy alphaNum <* whiteSpace lexer
+  f n <* notFollowedBy alphaNum <* skipSpaces
   where
     f :: Integer -> Parser Integer
     f 0 = return 0
