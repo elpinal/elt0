@@ -1,5 +1,6 @@
 module ELT0.Program
-  ( Inst(..)
+  ( Program(..)
+  , Inst(..)
   , Reg(..)
   , Operand(..)
   , Val(..)
@@ -30,6 +31,7 @@ data Inst
   deriving (Eq, Show)
 
 newtype Program = Program [Inst]
+  deriving (Eq, Show)
 
 class Display a where
   display :: a -> String

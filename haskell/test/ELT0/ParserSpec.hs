@@ -13,27 +13,28 @@ spec = do
     it "parses instructions" $ do
       let reg = Register . Reg
       let word = Value . Word
+      let prog = return . Program
 
-      mainParser ""               `shouldBe` return []
-      mainParser "mov R0 R1"      `shouldBe` return [Reg 0 `Mov` reg 1]
-      mainParser "mov R128 R100"  `shouldBe` return [Reg 128 `Mov` reg 100]
-      mainParser "add R0 1 2"     `shouldBe` return [Add (Reg 0) (Value $ Word 1) (Value $ Word 2)]
-      mainParser "add R0 1 R2"    `shouldBe` return [Add (Reg 0) (Value $ Word 1) (reg 2)]
-      mainParser "sub R1 R4 R9"   `shouldBe` return [Sub (Reg 1) (reg 4) (reg 9)]
-      mainParser "and R1 R4 R9"   `shouldBe` return [And (Reg 1) (reg 4) (reg 9)]
-      mainParser "or R1 128 R128" `shouldBe` return [Or (Reg 1) (word 128) (reg 128)]
-      mainParser "not R1 128"     `shouldBe` return [Reg 1 `Not` word 128]
-      mainParser "shl R2 R10 R8"  `shouldBe` return [Shl (Reg 2) (reg 10) (reg 8)]
-      mainParser "shr R2 R10 R8"  `shouldBe` return [Shr (Reg 2) (reg 10) (reg 8)]
+      mainParser ""               `shouldBe` prog []
+      mainParser "mov R0 R1"      `shouldBe` prog [Reg 0 `Mov` reg 1]
+      mainParser "mov R128 R100"  `shouldBe` prog [Reg 128 `Mov` reg 100]
+      mainParser "add R0 1 2"     `shouldBe` prog [Add (Reg 0) (Value $ Word 1) (Value $ Word 2)]
+      mainParser "add R0 1 R2"    `shouldBe` prog [Add (Reg 0) (Value $ Word 1) (reg 2)]
+      mainParser "sub R1 R4 R9"   `shouldBe` prog [Sub (Reg 1) (reg 4) (reg 9)]
+      mainParser "and R1 R4 R9"   `shouldBe` prog [And (Reg 1) (reg 4) (reg 9)]
+      mainParser "or R1 128 R128" `shouldBe` prog [Or (Reg 1) (word 128) (reg 128)]
+      mainParser "not R1 128"     `shouldBe` prog [Reg 1 `Not` word 128]
+      mainParser "shl R2 R10 R8"  `shouldBe` prog [Shl (Reg 2) (reg 10) (reg 8)]
+      mainParser "shr R2 R10 R8"  `shouldBe` prog [Shr (Reg 2) (reg 10) (reg 8)]
 
-      mainParser "mov R0 R1 ;"  `shouldBe` return [Reg 0 `Mov` reg 1]
-      mainParser "mov R0 R1 ;;" `shouldBe` return [Reg 0 `Mov` reg 1]
+      mainParser "mov R0 R1 ;"  `shouldBe` prog [Reg 0 `Mov` reg 1]
+      mainParser "mov R0 R1 ;;" `shouldBe` prog [Reg 0 `Mov` reg 1]
 
-      mainParser "not R1 128 ; not R8 7" `shouldBe` return [Reg 1 `Not` word 128, Reg 8 `Not` word 7]
-      mainParser "mov R1 128 ; mov R8 7" `shouldBe` return [Reg 1 `Mov` word 128, Reg 8 `Mov` word 7]
+      mainParser "not R1 128 ; not R8 7" `shouldBe` prog [Reg 1 `Not` word 128, Reg 8 `Not` word 7]
+      mainParser "mov R1 128 ; mov R8 7" `shouldBe` prog [Reg 1 `Mov` word 128, Reg 8 `Mov` word 7]
 
-      mainParser "mov R1 128 \n mov R8 7"    `shouldBe` return [Reg 1 `Mov` word 128, Reg 8 `Mov` word 7]
-      mainParser "mov R1 128 \n \n mov R8 7" `shouldBe` return [Reg 1 `Mov` word 128, Reg 8 `Mov` word 7]
+      mainParser "mov R1 128 \n mov R8 7"    `shouldBe` prog [Reg 1 `Mov` word 128, Reg 8 `Mov` word 7]
+      mainParser "mov R1 128 \n \n mov R8 7" `shouldBe` prog [Reg 1 `Mov` word 128, Reg 8 `Mov` word 7]
 
       mainParser "mov"          `shouldSatisfy` isLeft
       mainParser "mov ; R0 R1"  `shouldSatisfy` isLeft

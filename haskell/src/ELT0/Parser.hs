@@ -96,10 +96,10 @@ inst3op op = op <$> reg <*> operand <*> operand
 instSep :: Parser ()
 instSep = () <$ symbol lexer "\n" <|> skipMany1 (semi lexer)
 
-insts :: Parser [Inst]
-insts = inst `sepEndBy` instSep
+insts :: Parser Program
+insts = Program <$> inst `sepEndBy` instSep
 
-mainParser :: String -> Either ParseError [Inst]
+mainParser :: String -> Either ParseError Program
 mainParser = run $ insts <* eof
 
 run :: Parser a -> String -> Either ParseError a
