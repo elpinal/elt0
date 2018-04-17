@@ -1,12 +1,19 @@
 module Main where
 
+import Control.Monad
+import System.IO
+
 import ELT0.Parser
 import ELT0.Program
 
 main :: IO ()
-main = interact process
+main = process
 
-process :: String -> String
-process s = case mainParser s of
-  Right p -> display p
-  Left e -> show e
+process :: IO ()
+process = forever $ do
+  putStr "> "
+  hFlush stdout
+  s <- getLine
+  putStr $ case mainParser s of
+    Right p -> display p
+    Left e -> show e ++ "\n"
