@@ -8,7 +8,6 @@ module ELT0.Parser
   ) where
 
 import Text.Parsec
-import Text.Parsec.Char
 import Text.Parsec.Language
 import Text.Parsec.String
 import Text.Parsec.Token
