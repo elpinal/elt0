@@ -25,13 +25,16 @@ spec = do
       mainParser "shl R2 R10 R8"  `shouldBe` return [Shl (Reg 2) (reg 10) (reg 8)]
       mainParser "shr R2 R10 R8"  `shouldBe` return [Shr (Reg 2) (reg 10) (reg 8)]
 
+      mainParser "mov R0 R1 ;"  `shouldBe` return [Reg 0 `Mov` reg 1]
+      mainParser "mov R0 R1 ;;" `shouldBe` return [Reg 0 `Mov` reg 1]
+
       mainParser "not R1 128 ; not R8 7" `shouldBe` return [Reg 1 `Not` word 128, Reg 8 `Not` word 7]
       mainParser "mov R1 128 ; mov R8 7" `shouldBe` return [Reg 1 `Mov` word 128, Reg 8 `Mov` word 7]
 
-      mainParser "mov R1 128 \n mov R8 7" `shouldBe` return [Reg 1 `Mov` word 128, Reg 8 `Mov` word 7]
+      mainParser "mov R1 128 \n mov R8 7"    `shouldBe` return [Reg 1 `Mov` word 128, Reg 8 `Mov` word 7]
+      mainParser "mov R1 128 \n \n mov R8 7" `shouldBe` return [Reg 1 `Mov` word 128, Reg 8 `Mov` word 7]
 
       mainParser "mov"          `shouldSatisfy` isLeft
-      mainParser "mov R0 R1 ;;" `shouldSatisfy` isLeft
       mainParser "mov ; R0 R1"  `shouldSatisfy` isLeft
 
   describe "reg" $

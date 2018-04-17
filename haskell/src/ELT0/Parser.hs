@@ -118,8 +118,8 @@ inst = choice . map try $
 inst3op :: (Reg -> Operand -> Operand -> a) -> Parser a
 inst3op op = op <$> reg <*> operand <*> operand
 
-instSep :: Parser String
-instSep = symbol lexer "\n" <|> semi lexer
+instSep :: Parser ()
+instSep = () <$ symbol lexer "\n" <|> skipMany1 (semi lexer)
 
 insts :: Parser [Inst]
 insts = inst `sepEndBy` instSep
