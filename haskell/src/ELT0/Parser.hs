@@ -124,7 +124,7 @@ insts = do
   return p
 
 mainParser :: String -> Either ParseError Program
-mainParser = run $ insts <* eof
+mainParser = run $ whiteSpace lexer >> insts <* eof
 
 run :: Parser a -> String -> Either ParseError a
 run p = parse p "<filename>"

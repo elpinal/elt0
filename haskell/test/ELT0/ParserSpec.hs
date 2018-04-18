@@ -16,6 +16,7 @@ spec = do
       let prog = return . Program
 
       mainParser ""               `shouldBe` prog []
+      mainParser " "              `shouldBe` prog []
       mainParser "mov R0 R1"      `shouldBe` prog [Reg 0 `Mov` reg 1]
       mainParser "mov R128 R100"  `shouldBe` prog [Reg 128 `Mov` reg 100]
       mainParser "add R0 1 2"     `shouldBe` prog [Add (Reg 0) (Value $ Word 1) (Value $ Word 2)]
@@ -43,6 +44,8 @@ spec = do
       mainParser "mov R1 0 %"              `shouldBe` prog [Reg 1 `Mov` word 0]
       mainParser "mov R1 0 % \n"           `shouldBe` prog [Reg 1 `Mov` word 0]
       mainParser "mov R1 0 % ; ; not R0 1" `shouldBe` prog [Reg 1 `Mov` word 0, Reg 0 `Not` word 1]
+
+      mainParser " ; ;  mov R1 0 %  ; ; \n %" `shouldBe` prog [Reg 1 `Mov` word 0]
 
   describe "reg" $
     it "parses a register" $ do
