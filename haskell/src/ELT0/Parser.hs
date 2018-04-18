@@ -22,17 +22,6 @@ import ELT0.Program
 
 def :: LanguageDef st
 def = emptyDef
-  { reservedNames =
-    [ "mov"
-    , "add"
-    , "sub"
-    , "and"
-    , "or"
-    , "not"
-    , "shl"
-    , "shr"
-    ]
-  }
 
 lexer :: GenTokenParser String u Identity
 lexer = makeTokenParser def
@@ -79,17 +68,24 @@ toReg _ = Nothing
 operand :: Parser Operand
 operand = Register <$> reg <|> Value <$> val
 
+opname :: String -> Parser ()
+opname s = do
+  xs <- lookAhead ident <?> "opname"
+  if xs == s
+    then void ident
+    else unexpected . show $ xs ++ ": not instruction"
+
 inst :: Parser Inst
 inst = choice
-  [ reserved lexer "mov" $> Mov <*> reg <*> operand
-  , reserved lexer "add" *> inst3op Add
-  , reserved lexer "sub" *> inst3op Sub
-  , reserved lexer "and" *> inst3op And
-  , reserved lexer "or"  *> inst3op Or
-  , reserved lexer "not" $> Not <*> reg <*> operand
-  , reserved lexer "shl" *> inst3op Shl
-  , reserved lexer "shr" *> inst3op Shr
-  ]
+  [ opname "mov" $> Mov <*> reg <*> operand
+  , opname "add" *> inst3op Add
+  , opname "sub" *> inst3op Sub
+  , opname "and" *> inst3op And
+  , opname "or"  *> inst3op Or
+  , opname "not" $> Not <*> reg <*> operand
+  , opname "shl" *> inst3op Shl
+  , opname "shr" *> inst3op Shr
+  ] <?> "instruction"
 
 inst3op :: (Reg -> Operand -> Operand -> a) -> Parser a
 inst3op op = op <$> reg <*> operand <*> operand
@@ -107,7 +103,7 @@ comment :: Parser ()
 comment = choice
   [ symbol lexer "%" >> manyTill anyChar ((instSep >> optional comment) <|> lookAhead eof) $> ()
   , instSep >> optional comment
-  ]
+  ] <?> show ";"
 
 sepBy' :: Parser a -> Parser b -> Parser [a]
 sepBy' p sep = do
