@@ -80,7 +80,7 @@ operand :: Parser Operand
 operand = Register <$> reg <|> Value <$> val
 
 inst :: Parser Inst
-inst = choice . map try $
+inst = choice
   [ reserved lexer "mov" $> Mov <*> reg <*> operand
   , reserved lexer "add" *> inst3op Add
   , reserved lexer "sub" *> inst3op Sub
