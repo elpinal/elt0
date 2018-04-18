@@ -39,6 +39,11 @@ spec = do
       mainParser "mov"          `shouldSatisfy` isLeft
       mainParser "mov ; R0 R1"  `shouldSatisfy` isLeft
 
+      mainParser "%"                       `shouldBe` prog []
+      mainParser "mov R1 0 %"              `shouldBe` prog [Reg 1 `Mov` word 0]
+      mainParser "mov R1 0 % \n"           `shouldBe` prog [Reg 1 `Mov` word 0]
+      mainParser "mov R1 0 % ; ; not R0 1" `shouldBe` prog [Reg 1 `Mov` word 0, Reg 0 `Not` word 1]
+
   describe "reg" $
     it "parses a register" $ do
       run reg "R0"          `shouldBe` return (Reg 0)
@@ -100,3 +105,13 @@ spec = do
       run inst "movR0 R1" `shouldSatisfy` isLeft
       run inst "mov R0"   `shouldSatisfy` isLeft
       run inst "mov"      `shouldSatisfy` isLeft
+
+  describe "commentSep" $
+    it "parses a commentSep" $ do
+      run commentSep ";"                      `shouldSatisfy` isRight
+      run commentSep "%;"                     `shouldSatisfy` isRight
+      run commentSep "% ;"                    `shouldSatisfy` isRight
+      run commentSep "% abc ;"                `shouldSatisfy` isRight
+      run commentSep "% mov R0 1 ;"           `shouldSatisfy` isRight
+      run commentSep "% mov 1 ;"              `shouldSatisfy` isRight
+      run commentSep "% mov 1 ; % mov \n r ;" `shouldSatisfy` isRight

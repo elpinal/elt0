@@ -5,6 +5,7 @@ module ELT0.Parser
   , inst
   , operand
   , reg
+  , commentSep
   ) where
 
 import Text.Parsec
@@ -94,10 +95,33 @@ inst3op :: (Reg -> Operand -> Operand -> a) -> Parser a
 inst3op op = op <$> reg <*> operand <*> operand
 
 instSep :: Parser ()
-instSep = () <$ symbol lexer "\n" <|> skipMany1 (semi lexer)
+instSep = (symbol lexer "\n" <|> semi lexer) $> ()
+
+commentSep :: Parser ()
+commentSep = choice
+  [ symbol lexer "%" >> manyTill anyChar instSep $> ()
+  , instSep
+  ]
+
+comment :: Parser ()
+comment = choice
+  [ symbol lexer "%" >> manyTill anyChar ((instSep >> optional comment) <|> lookAhead eof) $> ()
+  , instSep >> optional comment
+  ]
+
+sepBy' :: Parser a -> Parser b -> Parser [a]
+sepBy' p sep = do
+  { x <- p
+  ; xs <- many . try $ sep >> p
+  ; return (x : xs)
+  } <|> return []
 
 insts :: Parser Program
-insts = Program <$> inst `sepEndBy` instSep
+insts = do
+  optional comment
+  p <- Program <$> inst `sepBy'` many1 commentSep
+  optional comment
+  return p
 
 mainParser :: String -> Either ParseError Program
 mainParser = run $ insts <* eof
