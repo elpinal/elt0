@@ -9,7 +9,7 @@ module ELT0.Program
 
 import Data.Word
 
-newtype Reg = Reg Integer
+newtype Reg = Reg Word32
   deriving (Eq, Show)
 
 newtype Val = Word Word32

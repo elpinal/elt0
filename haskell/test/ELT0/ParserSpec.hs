@@ -28,93 +28,46 @@ spec = do
       mainParser "shl R2 R10 R8"  `shouldBe` prog [Shl (Reg 2) (reg 10) (reg 8)]
       mainParser "shr R2 R10 R8"  `shouldBe` prog [Shr (Reg 2) (reg 10) (reg 8)]
 
-      mainParser "mov R0 R1 ;"  `shouldBe` prog [Reg 0 `Mov` reg 1]
-      mainParser "mov R0 R1 ;;" `shouldBe` prog [Reg 0 `Mov` reg 1]
+      mainParser "mov R0 R1 \n"   `shouldBe` prog [Reg 0 `Mov` reg 1]
+      mainParser "mov R0 R1 \n\n" `shouldBe` prog [Reg 0 `Mov` reg 1]
 
-      mainParser "not R1 128 ; not R8 7" `shouldBe` prog [Reg 1 `Not` word 128, Reg 8 `Not` word 7]
-      mainParser "mov R1 128 ; mov R8 7" `shouldBe` prog [Reg 1 `Mov` word 128, Reg 8 `Mov` word 7]
+      mainParser "not R1 128 \n not R8 7" `shouldBe` prog [Reg 1 `Not` word 128, Reg 8 `Not` word 7]
+      mainParser "mov R1 128 \n mov R8 7" `shouldBe` prog [Reg 1 `Mov` word 128, Reg 8 `Mov` word 7]
 
-      mainParser "mov R1 128 \n mov R8 7"    `shouldBe` prog [Reg 1 `Mov` word 128, Reg 8 `Mov` word 7]
       mainParser "mov R1 128 \n \n mov R8 7" `shouldBe` prog [Reg 1 `Mov` word 128, Reg 8 `Mov` word 7]
 
       mainParser "mov"          `shouldSatisfy` isLeft
-      mainParser "mov ; R0 R1"  `shouldSatisfy` isLeft
+      mainParser "mov \n R0 R1" `shouldSatisfy` isLeft
 
-      mainParser "%"                       `shouldBe` prog []
-      mainParser "mov R1 0 %"              `shouldBe` prog [Reg 1 `Mov` word 0]
-      mainParser "mov R1 0 % \n"           `shouldBe` prog [Reg 1 `Mov` word 0]
-      mainParser "mov R1 0 % ; ; not R0 1" `shouldBe` prog [Reg 1 `Mov` word 0, Reg 0 `Not` word 1]
+      mainParser "%"                         `shouldBe` prog []
+      mainParser "mov R1 0 %"                `shouldBe` prog [Reg 1 `Mov` word 0]
+      mainParser "mov R1 0 % \n"             `shouldBe` prog [Reg 1 `Mov` word 0]
+      mainParser "mov R1 0 % \n \n not R0 1" `shouldBe` prog [Reg 1 `Mov` word 0, Reg 0 `Not` word 1]
 
-      mainParser " ; ;  mov R1 0 %  ; ; \n %" `shouldBe` prog [Reg 1 `Mov` word 0]
+      mainParser " \n \n  mov R1 0 %  \n \n \n %" `shouldBe` prog [Reg 1 `Mov` word 0]
 
   describe "reg" $
     it "parses a register" $ do
-      run reg "R0"          `shouldBe` return (Reg 0)
-      run reg "R1"          `shouldBe` return (Reg 1)
-      run reg "R99"         `shouldBe` return (Reg 99)
-      run reg "R4294967296" `shouldBe` return (Reg 4294967296)
+      runParser reg [RegToken 0]             `shouldBe` return (Just (Reg 0, []))
+      runParser reg [RegToken 0, RegToken 1] `shouldBe` return (Just (Reg 0, [RegToken 1]))
 
-      run reg "R0 x"  `shouldBe` return (Reg 0)
-      run reg "R1 R0" `shouldBe` return (Reg 1)
+  describe "lex1" $
+    it "lex a token" $ do
+      runLexer lex1 ""          `shouldBe` return (Nothing)
+      runLexer lex1 "R0"        `shouldBe` return (Just (RegToken 0, []))
+      runLexer lex1 " R1"       `shouldBe` return (Just (RegToken 1, []))
+      runLexer lex1 "R0 R1"     `shouldBe` return (Just (RegToken 0, " R1"))
+      runLexer lex1 "mov R0 R1" `shouldBe` return (Just (Ident "mov", " R0 R1"))
 
-      run reg "R"   `shouldSatisfy` isLeft
-      run reg "R00" `shouldSatisfy` isLeft
-      run reg "R08" `shouldSatisfy` isLeft
-      run reg "a"   `shouldSatisfy` isLeft
-      run reg ""    `shouldSatisfy` isLeft
-      run reg "R 0" `shouldSatisfy` isLeft
+      runLexer lex1 "R0a" `shouldSatisfy` isLeft
+      runLexer lex1 "0a"  `shouldSatisfy` isLeft
+      runLexer lex1 "R"   `shouldSatisfy` isLeft
+      runLexer lex1 "R@"  `shouldSatisfy` isLeft
 
-  describe "operand" $
-    it "parses an operand" $ do
-      let reg = Register . Reg
-      let word = Value . Word
-
-      run operand "R0"          `shouldBe` return (reg 0)
-      run operand "R1"          `shouldBe` return (reg 1)
-      run operand "R99"         `shouldBe` return (reg 99)
-      run operand "R4294967296" `shouldBe` return (reg 4294967296)
-
-      run operand "0"          `shouldBe` return (word 0)
-      run operand "1"          `shouldBe` return (word 1)
-      run operand "99"         `shouldBe` return (word 99)
-      run operand "4294967295" `shouldBe` return (word 4294967295)
-
-      run operand "R0 x"  `shouldBe` return (reg 0)
-      run operand "R1 R0" `shouldBe` return (reg 1)
-
-      run operand "0 x" `shouldBe` return (word 0)
-      run operand "1 0" `shouldBe` return (word 1)
-
-      run operand "R"   `shouldSatisfy` isLeft
-      run operand "R00" `shouldSatisfy` isLeft
-      run operand "R08" `shouldSatisfy` isLeft
-      run operand "a"   `shouldSatisfy` isLeft
-      run operand ""    `shouldSatisfy` isLeft
-      run operand "R 0" `shouldSatisfy` isLeft
-
-      run operand "00" `shouldSatisfy` isLeft
-      run operand "08" `shouldSatisfy` isLeft
-      run operand "a"  `shouldSatisfy` isLeft
-      run operand ""   `shouldSatisfy` isLeft
-      run operand " 0" `shouldSatisfy` isLeft
-
-  describe "inst" $
-    it "parses an instruction" $ do
-      let reg = Register . Reg
-      let word = Value . Word
-
-      run inst "mov R0 R1" `shouldBe` return (Reg 0 `Mov` reg 1)
-
-      run inst "movR0 R1" `shouldSatisfy` isLeft
-      run inst "mov R0"   `shouldSatisfy` isLeft
-      run inst "mov"      `shouldSatisfy` isLeft
-
-  describe "commentSep" $
-    it "parses a commentSep" $ do
-      run commentSep ";"                      `shouldSatisfy` isRight
-      run commentSep "%;"                     `shouldSatisfy` isRight
-      run commentSep "% ;"                    `shouldSatisfy` isRight
-      run commentSep "% abc ;"                `shouldSatisfy` isRight
-      run commentSep "% mov R0 1 ;"           `shouldSatisfy` isRight
-      run commentSep "% mov 1 ;"              `shouldSatisfy` isRight
-      run commentSep "% mov 1 ; % mov \n r ;" `shouldSatisfy` isRight
+  describe "lexer" $
+    it "lex tokens" $ do
+      runLexer lexer ""          `shouldBe` return []
+      runLexer lexer "R0"        `shouldBe` return [RegToken 0]
+      runLexer lexer " R1"       `shouldBe` return [RegToken 1]
+      runLexer lexer "R0 R1"     `shouldBe` return [RegToken 0, RegToken 1]
+      runLexer lexer "mov R0 R1" `shouldBe` return [Ident "mov", RegToken 0, RegToken 1]

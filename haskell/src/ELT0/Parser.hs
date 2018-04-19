@@ -1,18 +1,18 @@
 module ELT0.Parser
   ( mainParser
-  , run
-  , insts
-  , inst
-  , operand
+  , runParser
+  , runLexer
   , reg
-  , commentSep
+  , operand
+  , lexer
+  , lex1
+  , Token(..)
   ) where
 
-import Text.Parsec
-import Text.Parsec.Language
-import Text.Parsec.String
-import Text.Parsec.Token
-
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Except
+import Control.Monad.Trans.State
+import Data.Bifunctor
 import Data.Char
 import Data.Functor
 import Data.Functor.Identity
@@ -20,107 +20,166 @@ import Data.Word
 
 import ELT0.Program
 
-def :: LanguageDef st
-def = emptyDef
+data Token
+  = Ident String
+  | Digits Word32 -- not followed by alphabets.
+  -- | Zero -- not followed by alphanum.
+  | Newline
+  | RegToken Word32
+  deriving (Eq, Show)
 
-lexer :: GenTokenParser String u Identity
-lexer = makeTokenParser def
+data Error
+  = LexError LexError
+  | ParseError ParseError
+  deriving (Eq, Show)
 
-digitInteger :: Parser Integer
-digitInteger = toInteger . digitToInt <$> digit
+data LexError
+  = ZeroStartDigits Position
+  | IllegalChar Char Position
+  | UpperNonReg String Position
+  | FollowedByAlpha Position
+  deriving (Eq, Show)
 
-skipSpaces :: Parser ()
-skipSpaces = skipMany $ char ' '
+data ParseError
+  = Expect TokenKind (Maybe Token)
+  deriving (Eq, Show)
 
-dec :: Parser Integer
-dec = do
-  n <- digitInteger
-  f n <* notFollowedBy alphaNum <* skipSpaces
+data TokenKind
+  = Mnemonic
+  | RegisterLit
+  | Operand
+  | NewlineLit
+  deriving (Eq, Show)
+
+newtype Position = Position { getPosition :: (Int, Int) }
+  deriving (Eq, Show)
+
+position :: Position
+position = Position (1, 1)
+
+mapPosition :: ((Int, Int) -> (Int, Int)) -> Position -> Position
+mapPosition f = Position . f . getPosition
+
+type Lexer m a = String -> ExceptT LexError (StateT Position m) a
+
+type Parser m a = [Token] -> ExceptT ParseError m a
+
+incLine :: Monad m => StateT Position m ()
+incLine = modify . mapPosition $ \(x, y) -> (x + 1, 1)
+
+incCol :: Monad m => StateT Position m ()
+incCol = modify . mapPosition $ second (+ 1)
+
+incColN :: Monad m => Int -> StateT Position m ()
+incColN n | n > 0 = incCol >> incColN (n - 1)
+incColN _         = return ()
+
+incPosByChar :: Monad m => Char -> StateT Position m ()
+incPosByChar '\n' = incLine
+incPosByChar _    = incCol
+
+getPos :: Monad m => StateT Position m Position
+getPos = get
+
+lex1 :: Monad m => Lexer m (Maybe (Token, String))
+lex1 [] = return Nothing
+lex1 (x : xs) = do
+  case x of
+    _ | isDigit x ->
+      let (ds, ys) = first (x :) $ span isDigit xs in
+        case ys of
+          (y : _) | isAsciiAlpha y -> lift getPos >>= throwE . FollowedByAlpha
+          _ -> fmap (first Digits) <$> lexDigits ds ys
+    _ | isAsciiAlpha x ->
+      let (s, ys) = first (x :) $ span isAlphanum xs in
+        case s of
+          ('R' : ds) | all isDigit ds && not (null ds) -> lift (incColN $ length s) >> (fmap (first RegToken) <$> lexDigits ds ys)
+          (x : xs)   | isAsciiUpper x                  -> lift getPos >>= throwE . UpperNonReg s
+          _                                            -> lift (incColN $ length s) $> Just (Ident s, ys)
+    ' ' -> lift incCol >> lex1 xs
+    '\n' -> lift incLine >> return (Just (Newline, xs))
+    '%' -> let (a, b) = break (== '\n') xs in lift (incColN $ length a) >> lex1 b
+    _ -> lift getPos >>= throwE . IllegalChar x
+
+-- Precondition: @all isDigit ds@ must hold.
+lexDigits :: Monad m => String -> String -> ExceptT LexError (StateT Position m) (Maybe (Word32, String))
+lexDigits ds ys =
+  case ds of
+    "0"                 -> lift (incColN 1) $> Just (0, ys)
+    (d : ds) | d /= '0' -> lift (incColN $ length ds + 1) $> Just (t, ys) where t = foldl (\x y -> x*10 + digitToWord y) (digitToWord d) ds
+    _                   -> lift getPos >>= throwE . ZeroStartDigits
+
+digitToWord :: Char -> Word32
+digitToWord = fromInteger . toInteger . digitToInt
+
+isAsciiAlpha :: Char -> Bool
+isAsciiAlpha c = isAsciiUpper c || isAsciiLower c
+
+isAlphanum :: Char -> Bool
+isAlphanum c = isAsciiAlpha c || isDigit c
+
+lexer :: Monad m => Lexer m [Token]
+lexer s = lex1 s >>= maybe (return []) (\(t, s) -> (t :) <$> lexer s)
+
+mainParser :: String -> Either Error Program
+mainParser = runIdentity . mainParser'
+
+mainParser' :: Monad m => String -> m (Either Error Program)
+mainParser' s = flip evalStateT position . runExceptT $ do
+  ts <- withExceptT LexError $ lexer s
+  is <- withExceptT ParseError $ parser ts
+  return $ Program is
+
+parser :: Monad m => Parser m [Inst]
+parser (Newline : ts) = parser ts
+parser ts = inst ts >>= maybe (return []) f
   where
-    f :: Integer -> Parser Integer
-    f 0 = return 0
-    f n = foldl (\a n -> a*10 + n) n <$> many digitInteger
+    f (i, []) = return [i]
+    f (i, Newline : ts) = (i :) <$> parser ts
+    f (i, t : _) = throwE $ Expect NewlineLit $ return t
 
-word32 :: Parser Word32
-word32 = fromInteger . toInteger <$> dec
+inst :: Monad m => Parser m (Maybe (Inst, [Token]))
+inst [] = return Nothing
+inst (Ident x : ts) = return <$> f x ts
+  where
+    f :: Monad m => String -> Parser m (Inst, [Token])
+    f "mov" = inst2op Mov
+    f "add" = inst3op Add
+    f "sub" = inst3op Sub
+    f "and" = inst3op And
+    f "or"  = inst3op Or
+    f "not" = inst2op Not
+    f "shl" = inst3op Shl
+    f "shr" = inst3op Shr
+    f x     = const $ throwE $ Expect Mnemonic $ return $ Ident x
+inst (t : ts) = throwE $ Expect Mnemonic $ return t
 
-val :: Parser Val
-val = Word <$> word32 <?> "value"
+inst2op :: Monad m => (Reg -> Operand -> a) -> Parser m (a, [Token])
+inst2op f ts = do
+  (r, ts) <- reg ts     >>= maybe (throwE $ Expect RegisterLit Nothing) return
+  (o, ts) <- operand ts >>= maybe (throwE $ Expect Operand Nothing) return
+  return (f r o, ts)
 
-ident :: Parser String
-ident = identifier lexer
+inst3op :: Monad m => (Reg -> Operand -> Operand -> a) -> Parser m (a, [Token])
+inst3op f ts = do
+  (r, ts)  <- reg ts     >>= maybe (throwE $ Expect RegisterLit Nothing) return
+  (o1, ts) <- operand ts >>= maybe (throwE $ Expect Operand Nothing) return
+  (o2, ts) <- operand ts >>= maybe (throwE $ Expect Operand Nothing) return
+  return (f r o1 o2, ts)
 
-col :: Parser String
-col = colon lexer
+reg :: Monad m => Parser m (Maybe (Reg, [Token]))
+reg [] = return Nothing
+reg (RegToken w : ts) = return $ Just (Reg w, ts)
+reg (t : ts) = throwE $ Expect RegisterLit $ return t
 
-reg :: Parser Reg
-reg = flip label "register" . try $ do
-  xs <- ident
-  case toReg xs of
-    Just n -> return $ Reg n
-    Nothing -> unexpected "non-register identifier"
+operand :: Monad m => Parser m (Maybe (Operand, [Token]))
+operand [] = return Nothing
+operand (Digits w : ts) = return $ Just (Value $ Word w, ts)
+operand (RegToken w : ts) = return $ Just (Register $ Reg w, ts) -- TODO: duplicate of `reg`.
+operand (t : ts) = throwE $ Expect Operand $ return t
 
-toReg :: String -> Maybe Integer
-toReg "R0" = return 0
-toReg ('R' : x : xs) | isDigit x && x /= '0' && all isDigit xs = return $ read (x : xs)
-toReg _ = Nothing
+runLexer :: Lexer Identity a -> String -> Either LexError a
+runLexer l s = runIdentity . flip evalStateT position . runExceptT $ l s
 
-operand :: Parser Operand
-operand = Register <$> reg <|> Value <$> val
-
-opname :: String -> Parser ()
-opname s = do
-  xs <- lookAhead ident <?> "opname"
-  if xs == s
-    then void ident
-    else unexpected . show $ xs ++ ": not instruction"
-
-inst :: Parser Inst
-inst = choice
-  [ opname "mov" $> Mov <*> reg <*> operand
-  , opname "add" *> inst3op Add
-  , opname "sub" *> inst3op Sub
-  , opname "and" *> inst3op And
-  , opname "or"  *> inst3op Or
-  , opname "not" $> Not <*> reg <*> operand
-  , opname "shl" *> inst3op Shl
-  , opname "shr" *> inst3op Shr
-  ] <?> "instruction"
-
-inst3op :: (Reg -> Operand -> Operand -> a) -> Parser a
-inst3op op = op <$> reg <*> operand <*> operand
-
-instSep :: Parser ()
-instSep = (symbol lexer "\n" <|> semi lexer) $> ()
-
-commentSep :: Parser ()
-commentSep = choice
-  [ symbol lexer "%" >> manyTill anyChar instSep $> ()
-  , instSep
-  ]
-
-comment :: Parser ()
-comment = choice
-  [ symbol lexer "%" >> manyTill anyChar ((instSep >> optional comment) <|> lookAhead eof) $> ()
-  , instSep >> optional comment
-  ] <?> show ";"
-
-sepBy' :: Parser a -> Parser b -> Parser [a]
-sepBy' p sep = do
-  { x <- p
-  ; xs <- many . try $ sep >> p
-  ; return (x : xs)
-  } <|> return []
-
-insts :: Parser Program
-insts = do
-  optional comment
-  p <- Program <$> inst `sepBy'` many1 commentSep
-  optional comment
-  return p
-
-mainParser :: String -> Either ParseError Program
-mainParser = run $ whiteSpace lexer >> insts <* eof
-
-run :: Parser a -> String -> Either ParseError a
-run p = parse p "<filename>"
+runParser :: Parser Identity a -> [Token] -> Either ParseError a
+runParser p ts = runIdentity . runExceptT $ p ts
