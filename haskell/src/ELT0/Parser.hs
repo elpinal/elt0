@@ -25,7 +25,7 @@ data Token
   | Digits Word32 -- not followed by alphabets.
   -- | Zero -- not followed by alphanum.
   | Newline
-  | RegToken Word32
+  | RegToken Word8
   deriving (Eq, Show)
 
 data Error
@@ -38,6 +38,7 @@ data LexError
   | IllegalChar Char Position
   | UpperNonReg String Position
   | FollowedByAlpha Position
+  | InvalidReg Position
   deriving (Eq, Show)
 
 data ParseError
@@ -93,23 +94,29 @@ lex1 (x : xs) = do
     _ | isAsciiAlpha x ->
       let (s, ys) = first (x :) $ span isAlphanum xs in
         case s of
-          ('R' : ds) | all isDigit ds && not (null ds) -> lift (incColN $ length s) >> (fmap (first RegToken) <$> lexDigits ds ys)
-          (x : xs)   | isAsciiUpper x                  -> lift getPos >>= throwE . UpperNonReg s
-          _                                            -> lift (incColN $ length s) $> Just (Ident s, ys)
+          ('R' : ds) | let l = length ds, 0 < l, l < 4, all isDigit ds ->
+            lift (incColN $ length s) >> lexDigits ds ys >>= f
+              where
+                f :: Monad m => Maybe (Word16, String) -> ExceptT LexError (StateT Position m) (Maybe (Token, String))
+                f (Just (w, z)) | w > 255 = lift getPos >>= throwE . InvalidReg
+                f (Just (w, z)) = return $ Just (RegToken . fromInteger $ toInteger w, z)
+                f Nothing = return Nothing
+          (x : xs)   | isAsciiUpper x -> lift getPos >>= throwE . UpperNonReg s
+          _ -> lift (incColN $ length s) $> Just (Ident s, ys)
     ' ' -> lift incCol >> lex1 xs
     '\n' -> lift incLine >> return (Just (Newline, xs))
     '%' -> let (a, b) = break (== '\n') xs in lift (incColN $ length a) >> lex1 b
     _ -> lift getPos >>= throwE . IllegalChar x
 
 -- Precondition: @all isDigit ds@ must hold.
-lexDigits :: Monad m => String -> String -> ExceptT LexError (StateT Position m) (Maybe (Word32, String))
+lexDigits :: (Monad m, Num a) => String -> String -> ExceptT LexError (StateT Position m) (Maybe (a, String))
 lexDigits ds ys =
   case ds of
     "0"                 -> lift (incColN 1) $> Just (0, ys)
     (d : ds) | d /= '0' -> lift (incColN $ length ds + 1) $> Just (t, ys) where t = foldl (\x y -> x*10 + digitToWord y) (digitToWord d) ds
     _                   -> lift getPos >>= throwE . ZeroStartDigits
 
-digitToWord :: Char -> Word32
+digitToWord :: Num a => Char -> a
 digitToWord = fromInteger . toInteger . digitToInt
 
 isAsciiAlpha :: Char -> Bool

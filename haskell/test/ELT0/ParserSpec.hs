@@ -59,6 +59,10 @@ spec = do
       runLexer lex1 "R0 R1"     `shouldBe` return (Just (RegToken 0, " R1"))
       runLexer lex1 "mov R0 R1" `shouldBe` return (Just (Ident "mov", " R0 R1"))
 
+      runLexer lex1 "R255"  `shouldBe` return (Just (RegToken 255, []))
+      runLexer lex1 "R256"  `shouldSatisfy` isLeft
+      runLexer lex1 "R2560" `shouldSatisfy` isLeft
+
       runLexer lex1 "R0a" `shouldSatisfy` isLeft
       runLexer lex1 "0a"  `shouldSatisfy` isLeft
       runLexer lex1 "R"   `shouldSatisfy` isLeft
