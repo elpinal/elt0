@@ -54,12 +54,12 @@ spec = do
   describe "lex1" $
     it "lex a token" $ do
       runLexer lex1 ""          `shouldBe` return (Nothing)
-      runLexer lex1 "R0"        `shouldBe` return (Just (RegToken 0, []))
-      runLexer lex1 " R1"       `shouldBe` return (Just (RegToken 1, []))
-      runLexer lex1 "R0 R1"     `shouldBe` return (Just (RegToken 0, " R1"))
-      runLexer lex1 "mov R0 R1" `shouldBe` return (Just (Ident "mov", " R0 R1"))
+      runLexer lex1 "R0"        `shouldBe` return (Just $ RegToken 0)
+      runLexer lex1 " R1"       `shouldBe` return (Just $ RegToken 1)
+      runLexer lex1 "R0 R1"     `shouldBe` return (Just $ RegToken 0)
+      runLexer lex1 "mov R0 R1" `shouldBe` return (Just $ Ident "mov")
 
-      runLexer lex1 "R255"  `shouldBe` return (Just (RegToken 255, []))
+      runLexer lex1 "R255"  `shouldBe` return (Just $ RegToken 255)
       runLexer lex1 "R256"  `shouldSatisfy` isLeft
       runLexer lex1 "R2560" `shouldSatisfy` isLeft
 

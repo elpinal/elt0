@@ -9,12 +9,12 @@ module ELT0.Parser
   , Token(..)
   ) where
 
+import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.State
 import Data.Bifunctor
 import Data.Char
-import Data.Functor
 import Data.Functor.Identity
 import Data.Word
 
@@ -61,62 +61,106 @@ position = Position (1, 1)
 mapPosition :: ((Int, Int) -> (Int, Int)) -> Position -> Position
 mapPosition f = Position . f . getPosition
 
-type Lex m a = ExceptT LexError (StateT Position m) a
+data Stream a = Stream
+  { uncons :: String -> Position -> (a, String, Position)
+  }
 
-type Lexer m a = String -> Lex m a
+runStream :: String -> Position -> Stream a -> a
+runStream x p (Stream f) = r where (r, _, _) = f x p
+
+getPos :: Stream Position
+getPos = Stream
+  { uncons = \s p -> (p, s, p)
+  }
+
+instance Functor Stream where
+  fmap f (Stream g) = Stream
+    { uncons = \s p -> let (x, y, z) = g s p in (f x, y, z)
+    }
+
+instance Applicative Stream where
+  pure x = Stream { uncons = \s p -> (x, s, p) }
+  (Stream f) <*> (Stream x) = Stream
+    { uncons = \s0 p0 ->
+      let (g, s1, p1) = f s0 p0 in
+      let (y, s2, p2) = x s1 p1 in
+        (g y, s2, p2)
+    }
+
+instance Monad Stream where
+  (Stream x) >>= f = Stream
+    { uncons = \s0 p0 ->
+      let (y, s1, p1) = x s0 p0 in
+      let (z, s2, p2) = uncons (f y) s1 p1 in
+        (z, s2, p2)
+    }
+
+satisfy :: (Char -> Bool) -> Stream (Maybe Char)
+satisfy f = Stream { uncons = g }
+  where
+    g [] p = (Nothing, [], p)
+    g (x : xs) p =
+      if f x
+        then (return x, xs, updatePos x p)
+        else (Nothing, x : xs, p)
+
+    updatePos '\n' = mapPosition $ bimap (+ 1) (const 1)
+    updatePos _    = mapPosition $ second (+ 1)
+
+char :: Stream (Maybe Char)
+char = satisfy $ const True
+
+while :: (Char -> Bool) -> Stream String
+while f = satisfy f >>= maybe (return []) (\x -> (x :) <$> while f)
+
+type Lexer a = ExceptT LexError Stream a
 
 type Parser m a = [Token] -> ExceptT ParseError m a
 
-incLine :: Monad m => StateT Position m ()
-incLine = modify . mapPosition $ \(x, y) -> (x + 1, 1)
+lex1 :: Lexer (Maybe Token)
+lex1 = lift char >>= maybe (return Nothing) f
+  where
+    f x | isDigit x      = lexWord x
+    f x | isAsciiAlpha x = lift (while isAlphanum) >>= fmap Just . lexLetters . (x :)
+    f ' '                = lex1
+    f '\n'               = return $ Just Newline
+    f '%'                = lift (while (/= '\n')) >> lex1
+    f x                  = lift getPos >>= throwE . IllegalChar x
 
-incCol :: Monad m => StateT Position m ()
-incCol = modify . mapPosition $ second (+ 1)
+-- Precondition: @isDigit x@ must hold.
+lexWord :: Char -> Lexer (Maybe Token)
+lexWord x = do
+  s <- lift $ while isDigit
+  b <- lift notFollowedByLetter
+  unless b $
+    lift getPos >>= throwE . FollowedByAlpha
+  Just . Digits <$> lexDigits (x : s)
 
-incColN :: Monad m => Int -> StateT Position m ()
-incColN n | n > 0 = incCol >> incColN (n - 1)
-incColN _         = return ()
-
-incPosByChar :: Monad m => Char -> StateT Position m ()
-incPosByChar '\n' = incLine
-incPosByChar _    = incCol
-
-getPos :: Monad m => StateT Position m Position
-getPos = get
-
-lex1 :: Monad m => Lexer m (Maybe (Token, String))
-lex1 [] = return Nothing
-lex1 (x : xs) = do
-  case x of
-    _ | isDigit x ->
-      let (ds, ys) = first (x :) $ span isDigit xs in
-        case ys of
-          (y : _) | isAsciiAlpha y -> lift getPos >>= throwE . FollowedByAlpha
-          _ -> fmap (first Digits) <$> lexDigits ds ys
-    _ | isAsciiAlpha x ->
-      let (s, ys) = first (x :) $ span isAlphanum xs in
-        case s of
-          ('R' : ds) | let l = length ds, 0 < l, l < 4, all isDigit ds ->
-            lift (incColN $ length s) >> lexDigits ds ys >>= f
-              where
-                f :: Monad m => Maybe (Word16, String) -> Lex m (Maybe (Token, String))
-                f (Just (w, z)) | w > 255 = lift getPos >>= throwE . InvalidReg
-                f (Just (w, z)) = return $ Just (RegToken . fromInteger $ toInteger w, z)
-                f Nothing = return Nothing
-          (x : xs)   | isAsciiUpper x -> lift getPos >>= throwE . UpperNonReg s
-          _ -> lift (incColN $ length s) $> Just (Ident s, ys)
-    ' ' -> lift incCol >> lex1 xs
-    '\n' -> lift incLine >> return (Just (Newline, xs))
-    '%' -> let (a, b) = break (== '\n') xs in lift (incColN $ length a) >> lex1 b
-    _ -> lift getPos >>= throwE . IllegalChar x
+notFollowedByLetter :: Stream Bool
+notFollowedByLetter = Stream
+  { uncons = f
+  }
+  where
+    f [] p = (True, [], p)
+    f a @ (x : _) p = if isAsciiAlpha x
+      then (False, a, p)
+      else (True, a, p)
 
 -- Precondition: @all isDigit ds@ must hold.
-lexDigits :: (Monad m, Num a) => String -> String -> Lex m (Maybe (a, String))
-lexDigits ds ys =
-  case ds of
-    "0"                 -> lift (incColN 1) $> Just (0, ys)
-    (d : ds) | d /= '0' -> lift (incColN $ length ds + 1) $> Just (t, ys) where t = foldl (\x y -> x*10 + digitToWord y) (digitToWord d) ds
-    _                   -> lift getPos >>= throwE . ZeroStartDigits
+lexDigits :: Num a => String -> Lexer a
+lexDigits "0"                 = return 0
+lexDigits (d : ds) | d /= '0' = return $ foldl (\x y -> x*10 + digitToWord y) (digitToWord d) ds
+lexDigits _                   = lift getPos >>= throwE . ZeroStartDigits
+
+lexLetters :: String -> Lexer Token
+lexLetters ('R' : ds) | let l = length ds, 0 < l, l < 4, all isDigit ds =
+  lexDigits ds >>= f
+    where
+      f :: Word16 -> Lexer Token
+      f w | w > 255 = lift getPos >>= throwE . InvalidReg
+      f w = return $ RegToken . fromInteger $ toInteger w
+lexLetters a @ (x : _) | isAsciiUpper x = lift getPos >>= throwE . UpperNonReg a
+lexLetters a = return $ Ident a
 
 digitToWord :: Num a => Char -> a
 digitToWord = fromInteger . toInteger . digitToInt
@@ -127,15 +171,15 @@ isAsciiAlpha c = isAsciiUpper c || isAsciiLower c
 isAlphanum :: Char -> Bool
 isAlphanum c = isAsciiAlpha c || isDigit c
 
-lexer :: Monad m => Lexer m [Token]
-lexer s = lex1 s >>= maybe (return []) (\(t, s) -> (t :) <$> lexer s)
+lexer :: Lexer [Token]
+lexer = lex1 >>= maybe (return []) (\t -> (t :) <$> lexer)
 
 mainParser :: String -> Either Error Program
 mainParser = runIdentity . mainParser'
 
 mainParser' :: Monad m => String -> m (Either Error Program)
 mainParser' s = flip evalStateT position . runExceptT $ do
-  ts <- withExceptT LexError $ lexer s
+  ts <- withExceptT LexError $ ExceptT . return $ runLexer lexer s
   is <- withExceptT ParseError $ parser ts
   return $ Program is
 
@@ -187,8 +231,8 @@ operand (Digits w : ts) = return $ Just (Value $ Word w, ts)
 operand (RegToken w : ts) = return $ Just (Register $ Reg w, ts) -- TODO: duplicate of `reg`.
 operand (t : ts) = throwE $ Expect Operand $ return t
 
-runLexer :: Lexer Identity a -> String -> Either LexError a
-runLexer l s = runIdentity . flip evalStateT position . runExceptT $ l s
+runLexer :: Lexer a -> String -> Either LexError a
+runLexer l s = runStream s position $ runExceptT l
 
 runParser :: Parser Identity a -> [Token] -> Either ParseError a
 runParser p ts = runIdentity . runExceptT $ p ts
