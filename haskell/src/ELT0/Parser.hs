@@ -61,7 +61,9 @@ position = Position (1, 1)
 mapPosition :: ((Int, Int) -> (Int, Int)) -> Position -> Position
 mapPosition f = Position . f . getPosition
 
-type Lexer m a = String -> ExceptT LexError (StateT Position m) a
+type Lex m a = ExceptT LexError (StateT Position m) a
+
+type Lexer m a = String -> Lex m a
 
 type Parser m a = [Token] -> ExceptT ParseError m a
 
@@ -97,7 +99,7 @@ lex1 (x : xs) = do
           ('R' : ds) | let l = length ds, 0 < l, l < 4, all isDigit ds ->
             lift (incColN $ length s) >> lexDigits ds ys >>= f
               where
-                f :: Monad m => Maybe (Word16, String) -> ExceptT LexError (StateT Position m) (Maybe (Token, String))
+                f :: Monad m => Maybe (Word16, String) -> Lex m (Maybe (Token, String))
                 f (Just (w, z)) | w > 255 = lift getPos >>= throwE . InvalidReg
                 f (Just (w, z)) = return $ Just (RegToken . fromInteger $ toInteger w, z)
                 f Nothing = return Nothing
@@ -109,7 +111,7 @@ lex1 (x : xs) = do
     _ -> lift getPos >>= throwE . IllegalChar x
 
 -- Precondition: @all isDigit ds@ must hold.
-lexDigits :: (Monad m, Num a) => String -> String -> ExceptT LexError (StateT Position m) (Maybe (a, String))
+lexDigits :: (Monad m, Num a) => String -> String -> Lex m (Maybe (a, String))
 lexDigits ds ys =
   case ds of
     "0"                 -> lift (incColN 1) $> Just (0, ys)
