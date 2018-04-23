@@ -9,11 +9,11 @@ module ELT0.Parser
   , Token(..)
   ) where
 
+import Control.Arrow
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.State
-import Data.Bifunctor
 import Data.Char
 import Data.Functor.Identity
 import Data.Word
@@ -37,7 +37,8 @@ data LexError
   = ZeroStartDigits Position
   | IllegalChar Char Position
   | UpperNonReg String Position
-  | FollowedByAlpha Position
+  -- represents a (digits) value of String which is followed at a position by some alphabet.
+  | FollowedByAlpha String Position
   | InvalidReg Position
   deriving (Eq, Show)
 
@@ -104,7 +105,7 @@ satisfy f = Stream { uncons = g }
         then (return x, xs, updatePos x p)
         else (Nothing, x : xs, p)
 
-    updatePos '\n' = mapPosition $ bimap (+ 1) (const 1)
+    updatePos '\n' = mapPosition $ (+ 1) *** (const 1)
     updatePos _    = mapPosition $ second (+ 1)
 
 char :: Stream (Maybe Char)
@@ -113,28 +114,33 @@ char = satisfy $ const True
 while :: (Char -> Bool) -> Stream String
 while f = satisfy f >>= maybe (return []) (\x -> (x :) <$> while f)
 
-type Lexer a = ExceptT LexError Stream a
+type Lexer = ExceptT LexError Stream
 
 type Parser m a = [Token] -> ExceptT ParseError m a
 
 lex1 :: Lexer (Maybe Token)
-lex1 = lift char >>= maybe (return Nothing) f
+lex1 = flip runKleisli () $ liftS getPos &&& liftS char >>> Kleisli g
   where
-    f x | isDigit x      = lexWord x
-    f x | isAsciiAlpha x = lift (while isAlphanum) >>= fmap Just . lexLetters . (x :)
-    f ' '                = lex1
-    f '\n'               = return $ Just Newline
-    f '%'                = lift (while (/= '\n')) >> lex1
-    f x                  = lift getPos >>= throwE . IllegalChar x
+    liftS = Kleisli . const . lift
+
+    g :: (Position, Maybe Char) -> Lexer (Maybe Token)
+    g (p, m) = maybe (return Nothing) (f p) m
+
+    f p x | isDigit x      = lexWord p x
+    f p x | isAsciiAlpha x = lift (while isAlphanum) >>= fmap Just . lexLetters p . (x :)
+    f _ ' '                = lex1
+    f _ '\n'               = return $ Just Newline
+    f _ '%'                = lift (while (/= '\n')) >> lex1
+    f p x                  = throwE $ IllegalChar x p
 
 -- Precondition: @isDigit x@ must hold.
-lexWord :: Char -> Lexer (Maybe Token)
-lexWord x = do
+lexWord :: Position -> Char -> Lexer (Maybe Token)
+lexWord p x = do
   s <- lift $ while isDigit
   b <- lift notFollowedByLetter
   unless b $
-    lift getPos >>= throwE . FollowedByAlpha
-  Just . Digits <$> lexDigits (x : s)
+    lift getPos >>= throwE . FollowedByAlpha (x : s)
+  Just . Digits <$> lexDigits p (x : s)
 
 notFollowedByLetter :: Stream Bool
 notFollowedByLetter = Stream
@@ -147,20 +153,20 @@ notFollowedByLetter = Stream
       else (True, a, p)
 
 -- Precondition: @all isDigit ds@ must hold.
-lexDigits :: Num a => String -> Lexer a
-lexDigits "0"                 = return 0
-lexDigits (d : ds) | d /= '0' = return $ foldl (\x y -> x*10 + digitToWord y) (digitToWord d) ds
-lexDigits _                   = lift getPos >>= throwE . ZeroStartDigits
+lexDigits :: Num a => Position -> String -> Lexer a
+lexDigits _ "0"                 = return 0
+lexDigits _ (d : ds) | d /= '0' = return $ foldl (\x y -> x*10 + digitToWord y) (digitToWord d) ds
+lexDigits p _                   = throwE $ ZeroStartDigits p
 
-lexLetters :: String -> Lexer Token
-lexLetters ('R' : ds) | let l = length ds, 0 < l, l < 4, all isDigit ds =
-  lexDigits ds >>= f
+lexLetters :: Position -> String -> Lexer Token
+lexLetters p ('R' : ds) | let l = length ds, 0 < l, l < 4, all isDigit ds =
+  lexDigits p ds >>= f
     where
       f :: Word16 -> Lexer Token
-      f w | w > 255 = lift getPos >>= throwE . InvalidReg
+      f w | w > 255 = throwE $ InvalidReg p
       f w = return $ RegToken . fromInteger $ toInteger w
-lexLetters a @ (x : _) | isAsciiUpper x = lift getPos >>= throwE . UpperNonReg a
-lexLetters a = return $ Ident a
+lexLetters p a @ (x : _) | isAsciiUpper x = throwE $ UpperNonReg a p
+lexLetters _ a = return $ Ident a
 
 digitToWord :: Num a => Char -> a
 digitToWord = fromInteger . toInteger . digitToInt
