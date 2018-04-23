@@ -40,6 +40,7 @@ data LexError
   -- represents a (digits) value of String which is followed at a position by some alphabet.
   | FollowedByAlpha String Position
   | InvalidReg Position
+  | OverflowImm32 Integer Position
   deriving (Eq, Show)
 
 data ParseError
@@ -140,7 +141,12 @@ lexWord p x = do
   b <- lift notFollowedByLetter
   unless b $
     lift getPos >>= throwE . FollowedByAlpha (x : s)
-  Just . Digits <$> lexDigits p (x : s)
+  fmap (Just . Digits) $ lexDigits p (x : s) >>= validImm32 p
+
+-- Precondition: @n >= 0@ must hold.
+validImm32 :: Position -> Integer -> Lexer Word32
+validImm32 p n | n > toInteger (maxBound :: Word32) = throwE $ OverflowImm32 n p
+validImm32 _ n = return $ fromInteger n
 
 notFollowedByLetter :: Stream Bool
 notFollowedByLetter = Stream
