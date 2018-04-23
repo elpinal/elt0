@@ -39,7 +39,7 @@ data LexError
   | UpperNonReg String Position
   -- represents a (digits) value of String which is followed at a position by some alphabet.
   | FollowedByAlpha String Position
-  | InvalidReg Position
+  | InvalidReg String Position
   | OverflowImm32 Integer Position
   deriving (Eq, Show)
 
@@ -165,11 +165,13 @@ lexDigits _ (d : ds) | d /= '0' = return $ foldl (\x y -> x*10 + digitToWord y) 
 lexDigits p _                   = throwE $ ZeroStartDigits p
 
 lexLetters :: Position -> String -> Lexer Token
-lexLetters p ('R' : ds) | let l = length ds, 0 < l, l < 4, all isDigit ds =
-  lexDigits p ds >>= f
+lexLetters p ('R' : ds) | let l = length ds, 0 < l, all isDigit ds =
+  if l < 4
+    then throwE $ InvalidReg ds p
+    else lexDigits p ds >>= f
     where
       f :: Word16 -> Lexer Token
-      f w | w > 255 = throwE $ InvalidReg p
+      f w | w > 255 = throwE $ InvalidReg ds p
       f w = return $ RegToken . fromInteger $ toInteger w
 lexLetters p a @ (x : _) | isAsciiUpper x = throwE $ UpperNonReg a p
 lexLetters _ a = return $ Ident a
