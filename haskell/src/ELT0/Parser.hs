@@ -167,8 +167,8 @@ lexDigits p _                   = throwE $ ZeroStartDigits p
 lexLetters :: Position -> String -> Lexer Token
 lexLetters p ('R' : ds) | let l = length ds, 0 < l, all isDigit ds =
   if l < 4
-    then throwE $ InvalidReg ds p
-    else lexDigits p ds >>= f
+    then lexDigits p ds >>= f
+    else throwE $ InvalidReg ds p
     where
       f :: Word16 -> Lexer Token
       f w | w > 255 = throwE $ InvalidReg ds p
