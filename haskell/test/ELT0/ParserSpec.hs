@@ -25,7 +25,8 @@ spec = do
       mainParser "x:\nshr R255 1000 288\nnot R0 0\n jmp a" `shouldBe` prog [Block "x" [Shr (Reg 255) (word 1000) (word 288), Reg 0 `Not` word 0] "a"]
 
       mainParser "L1:\n jmp main" `shouldSatisfy` isLeft -- labels must not start in upper case. 
-      -- mainParser "mov:\n jmp main" `shouldSatisfy` isLeft -- labels is distinguished from mnemonics.
+      mainParser "mov:\n jmp main" `shouldSatisfy` isLeft -- labels is distinguished from mnemonics.
+      mainParser "jmp:\n jmp main" `shouldSatisfy` isLeft
 
   describe "label" $ do
     it "parses a label" $ do
@@ -33,7 +34,7 @@ spec = do
 
   describe "jmp" $ do
     it "parses a jump instruction" $ do
-      runParser jmp [(Ident "jmp", newPosition 1 1), (Ident "L1", newPosition 1 1)] `shouldBe` return (Just ("L1", []))
+      runParser jmp [(Jmp, newPosition 1 1), (Ident "L1", newPosition 1 1)] `shouldBe` return (Just ("L1", []))
 
   describe "inst" $ do
     it "parses a instruction" $ do

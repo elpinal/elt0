@@ -49,6 +49,7 @@ fromToken = fst
 data Token
   = Ident String
   | Mnem Mnemonic
+  | Jmp
   | Digits Word32 -- not followed by alphabets.
   -- | Zero -- not followed by alphanum.
   | Newline
@@ -245,6 +246,7 @@ lexLetters p a = return (f a, p)
     f "not" = Mnem TNot
     f "shl" = Mnem TShl
     f "shr" = Mnem TShr
+    f "jmp" = Jmp -- Notice that this is not Mnem.
     f a = Ident a
 
 digitToWord :: Num a => Char -> a
@@ -329,7 +331,7 @@ label = predEOF p <* exactSkip Colon
 jmp :: Parser String
 jmp = predExact op Mnemonic *> predExact p LabelLit
   where
-    op (Ident "jmp") = Just ()
+    op Jmp = Just ()
     op _ = Nothing
 
     p (Ident s) = Just s -- FIXME: avoid mnemonics.
