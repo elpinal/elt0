@@ -325,7 +325,7 @@ block = Block <$> label <*> many (break *> inst) <*> (break *> jmp)
 label :: Parser String
 label = predEOF p <* exactSkip Colon
   where
-    p (Ident s, _) = Right s -- FIXME: avoid mnemonics.
+    p (Ident s, _) = Right s
     p t = Left $ Expect LabelLit $ Just t
 
 jmp :: Parser String
@@ -334,7 +334,7 @@ jmp = predExact op Mnemonic *> predExact p LabelLit
     op Jmp = Just ()
     op _ = Nothing
 
-    p (Ident s) = Just s -- FIXME: avoid mnemonics.
+    p (Ident s) = Just s
     p t = Nothing
 
 inst :: Parser Inst
