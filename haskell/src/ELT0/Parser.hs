@@ -9,11 +9,11 @@ module ELT0.Parser
   , Token(..)
   ) where
 
+import Control.Applicative
 import Control.Arrow
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
-import Control.Monad.Trans.State
 import Data.Char
 import Data.Functor.Identity
 import Data.Word
@@ -26,6 +26,7 @@ data Token
   -- | Zero -- not followed by alphanum.
   | Newline
   | RegToken Word8
+  | Colon
   deriving (Eq, Show)
 
 data Error
@@ -45,6 +46,7 @@ data LexError
 
 data ParseError
   = Expect TokenKind (Maybe Token)
+  | ExpectToken Token (Maybe Token)
   deriving (Eq, Show)
 
 data TokenKind
@@ -52,6 +54,7 @@ data TokenKind
   | RegisterLit
   | Operand
   | NewlineLit
+  | LabelLit
   deriving (Eq, Show)
 
 newtype Position = Position { getPosition :: (Int, Int) }
@@ -117,7 +120,33 @@ while f = satisfy f >>= maybe (return []) (\x -> (x :) <$> while f)
 
 type Lexer = ExceptT LexError Stream
 
-type Parser m a = [Token] -> ExceptT ParseError m a
+newtype Parser a = Parser { runParser :: [Token] -> Either ParseError (Maybe (a, [Token])) }
+
+instance Functor Parser where
+  fmap f (Parser p) = Parser p'
+    where
+      p' ts = (fmap $ first f) <$> p ts
+
+instance Applicative Parser where
+  pure x = Parser $ \ts -> Right $ Just (x, ts)
+  liftA2 f (Parser p1) (Parser p2) = Parser p
+    where
+      p ts = p1 ts >>= maybe (Right Nothing) g
+      g (x, ts) = p2 ts >>= maybe (Right Nothing) (h x)
+      h x (y, ts) = Right $ Just (f x y, ts)
+
+instance Monad Parser where
+  (Parser p) >>= f = Parser p'
+    where
+      p' ts = p ts >>= maybe (Right Nothing) g
+      -- g :: (a, c) -> Either e (Maybe (Parser b, c))
+      g = app . first (runParser . f)
+
+instance Alternative Parser where
+  empty = Parser $ const $ Right Nothing
+  (Parser p1) <|> (Parser p2) = Parser p
+    where
+      p ts = p1 ts >>= maybe (p2 ts) (Right . Just)
 
 lex1 :: Lexer (Maybe Token)
 lex1 = flip runKleisli () $ liftS getPos &&& liftS char >>> Kleisli g
@@ -131,6 +160,7 @@ lex1 = flip runKleisli () $ liftS getPos &&& liftS char >>> Kleisli g
     f p x | isAsciiAlpha x = lift (while isAlphanum) >>= fmap Just . lexLetters p . (x :)
     f _ ' '                = lex1
     f _ '\n'               = return $ Just Newline
+    f _ ':'                = return $ Just Colon
     f _ '%'                = lift (while (/= '\n')) >> lex1
     f p x                  = throwE $ IllegalChar x p
 
@@ -189,64 +219,113 @@ lexer :: Lexer [Token]
 lexer = lex1 >>= maybe (return []) (\t -> (t :) <$> lexer)
 
 mainParser :: String -> Either Error Program
-mainParser = runIdentity . mainParser'
+mainParser s = runIdentity . runExceptT $ mainParser' s
 
-mainParser' :: Monad m => String -> m (Either Error Program)
-mainParser' s = flip evalStateT position . runExceptT $ do
+mainParser' :: Monad m => String -> ExceptT Error m Program
+mainParser' s = do
   ts <- withExceptT LexError $ ExceptT . return $ runLexer lexer s
-  is <- withExceptT ParseError $ parser ts
-  return $ Program is
+  p <- ExceptT . return $ ParseError +++ maybe (Program []) fst $ runParser parser $ ts
+  return $ p
 
-parser :: Monad m => Parser m [Inst]
-parser (Newline : ts) = parser ts
-parser ts = inst ts >>= maybe (return []) f
+exactSkip :: Token -> Parser ()
+exactSkip x = Parser f
   where
-    f (i, []) = return [i]
-    f (i, Newline : ts) = (i :) <$> parser ts
-    f (i, t : _) = throwE $ Expect NewlineLit $ return t
+    f (t : ts) | t == x = Right $ Just ((), ts)
+    f (t : ts) = Left . ExpectToken x $ Just t
+    f [] = Left $ ExpectToken x Nothing
 
-inst :: Monad m => Parser m (Maybe (Inst, [Token]))
-inst [] = return Nothing
-inst (Ident x : ts) = return <$> f x ts
+option :: Token -> Parser ()
+option x = Parser f
   where
-    f :: Monad m => String -> Parser m (Inst, [Token])
-    f "mov" = inst2op Mov
-    f "add" = inst3op Add
-    f "sub" = inst3op Sub
-    f "and" = inst3op And
-    f "or"  = inst3op Or
-    f "not" = inst2op Not
-    f "shl" = inst3op Shl
-    f "shr" = inst3op Shr
-    f x     = const $ throwE $ Expect Mnemonic $ return $ Ident x
-inst (t : ts) = throwE $ Expect Mnemonic $ return t
+    f (t : ts) | t == x = Right $ Just ((), ts)
+    f (t : ts) = Right Nothing
+    f [] = Right Nothing
 
-inst2op :: Monad m => (Reg -> Operand -> a) -> Parser m (a, [Token])
-inst2op f ts = do
-  (r, ts) <- reg ts     >>= maybe (throwE $ Expect RegisterLit Nothing) return
-  (o, ts) <- operand ts >>= maybe (throwE $ Expect Operand Nothing) return
-  return (f r o, ts)
+predExact :: (Token -> Maybe a) -> TokenKind -> Parser a
+predExact p k = Parser f
+  where
+    f (t : ts) = case p t of
+      (Just x) -> Right $ Just (x, ts)
+      Nothing -> Left $ Expect k $ Just t
+    f [] = Left $ Expect k Nothing
 
-inst3op :: Monad m => (Reg -> Operand -> Operand -> a) -> Parser m (a, [Token])
-inst3op f ts = do
-  (r, ts)  <- reg ts     >>= maybe (throwE $ Expect RegisterLit Nothing) return
-  (o1, ts) <- operand ts >>= maybe (throwE $ Expect Operand Nothing) return
-  (o2, ts) <- operand ts >>= maybe (throwE $ Expect Operand Nothing) return
-  return (f r o1 o2, ts)
+predEOF :: (Token -> Either ParseError a) -> Parser a
+predEOF p = Parser f
+  where
+    f (t : ts) = Just . (\a -> (a, ts)) <$> p t
+    f [] = Right Nothing
 
-reg :: Monad m => Parser m (Maybe (Reg, [Token]))
-reg [] = return Nothing
-reg (RegToken w : ts) = return $ Just (Reg w, ts)
-reg (t : ts) = throwE $ Expect RegisterLit $ return t
+predOption :: (Token -> Maybe a) -> Parser a
+predOption p = Parser f
+  where
+    f (t : ts) = Right $ (\a -> (a, ts)) <$> p t
+    f [] = Right Nothing
 
-operand :: Monad m => Parser m (Maybe (Operand, [Token]))
-operand [] = return Nothing
-operand (Digits w : ts) = return $ Just (Value $ Word w, ts)
-operand (RegToken w : ts) = return $ Just (Register $ Reg w, ts) -- TODO: duplicate of `reg`.
-operand (t : ts) = throwE $ Expect Operand $ return t
+skipMany :: Alternative f => f a -> f ()
+skipMany = void . many
+
+skipSome :: Alternative f => f a -> f ()
+skipSome = void . some
+
+parser :: Parser Program
+parser = space *> p <* space
+  where
+    space = skipMany $ option Newline
+    p = Program <$> many block
+
+block :: Parser Block
+block = Block <$> label <*> many (break *> inst) <*> (break *> jmp)
+  where
+    break = skipSome $ option Newline
+
+label :: Parser String
+label = predEOF p <* exactSkip Colon
+  where
+    p (Ident s) = Right s -- FIXME: avoid mnemonics.
+    p t = Left $ Expect LabelLit $ Just t
+
+jmp :: Parser String
+jmp = predExact p LabelLit
+  where
+    p (Ident s) = Just s -- FIXME: avoid mnemonics.
+    p t = Nothing
+
+inst :: Parser Inst
+inst = join $ predOption p
+  where
+    p :: Token -> Maybe (Parser Inst)
+    p (Ident s) = f s
+    p _ = Nothing
+
+    f :: String -> Maybe (Parser Inst)
+    f "mov" = Just $ inst2op Mov
+    f "add" = Just $ inst3op Add
+    f "sub" = Just $ inst3op Sub
+    f "and" = Just $ inst3op And
+    f "or"  = Just $ inst3op Or
+    f "not" = Just $ inst2op Not
+    f "shl" = Just $ inst3op Shl
+    f "shr" = Just $ inst3op Shr
+    f x     = Nothing
+
+inst2op :: (Reg -> Operand -> a) -> Parser a
+inst2op f = f <$> reg <*> operand
+
+inst3op :: (Reg -> Operand -> Operand -> a) -> Parser a
+inst3op f = f <$> reg <*> operand <*> operand
+
+reg :: Parser Reg
+reg = predEOF f
+  where
+    f (RegToken w) = return $ Reg w
+    f t = Left $ Expect RegisterLit $ return t
+
+operand :: Parser Operand
+operand = predExact f Operand
+  where
+    f (Digits w) = Just $ Value $ Word w
+    f (RegToken w) = Just $ Register $ Reg w -- TODO: duplicate of `reg`.
+    f t = Nothing
 
 runLexer :: Lexer a -> String -> Either LexError a
 runLexer l s = runStream s position $ runExceptT l
-
-runParser :: Parser Identity a -> [Token] -> Either ParseError a
-runParser p ts = runIdentity . runExceptT $ p ts

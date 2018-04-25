@@ -1,5 +1,6 @@
 module ELT0.Program
   ( Program(..)
+  , Block(..)
   , Inst(..)
   , Reg(..)
   , Operand(..)
@@ -31,7 +32,10 @@ data Inst
   | Shr Reg Operand Operand
   deriving (Eq, Show)
 
-newtype Program = Program [Inst]
+newtype Program = Program [Block]
+  deriving (Eq, Show)
+
+data Block = Block String [Inst] String
   deriving (Eq, Show)
 
 class Display a where
@@ -60,5 +64,10 @@ display' (Not r o)     = ["not", display r, display o]
 display' (Shl r o1 o2) = ["shl", display r, display o1, display o2]
 display' (Shr r o1 o2) = ["shr", display r, display o1, display o2]
 
+instance Display Block where
+  display (Block l is jl) = l ++ ":\n" ++
+                            foldr (\i s -> display i ++ "\n" ++ s) "" is
+                            ++ "\njmp " ++ jl
+
 instance Display Program where
-  display (Program is) = foldr (\i s -> display i ++ "\n" ++ s) "" is
+  display (Program bs) = foldr (\b s -> display b ++ "\n" ++ s) "" bs
