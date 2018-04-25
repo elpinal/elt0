@@ -19,6 +19,7 @@ spec = do
       mainParser " " `shouldBe` prog []
 
       mainParser "main:\n jmp main" `shouldBe` prog [Block "main" [] "main"]
+      mainParser "main:\n jmp main\n" `shouldBe` prog [Block "main" [] "main"]
       -- mainParser "main: jmp main" `shouldSatisfy` isLeft
       mainParser "main:\n mov R0 1\n jmp next" `shouldBe` prog [Block "main" [Reg 0 `Mov` word 1] "next"]
       mainParser "x:\nshr R255 1000 288\nnot R0 0\n jmp a" `shouldBe` prog [Block "x" [Shr (Reg 255) (word 1000) (word 288), Reg 0 `Not` word 0] "a"]

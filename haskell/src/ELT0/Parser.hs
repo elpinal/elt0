@@ -312,7 +312,8 @@ parser :: Parser Program
 parser = space *> p <* space
   where
     space = skipMany $ option Newline
-    p = Program <$> many block
+    p = Program <$> ((:) <$> block <*> many (break *> block))
+    break = skipSome $ option Newline
 
 block :: Parser Block
 block = Block <$> label <*> many (break *> inst) <*> (break *> jmp)
