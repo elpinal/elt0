@@ -11,6 +11,9 @@ module ELT0.Parser
   , lex1
   , Token(..)
   , Mnemonic(..)
+  , fromToken
+  , Position
+  , newPosition
   ) where
 
 import Control.Applicative
@@ -34,6 +37,14 @@ data Mnemonic
   | TShl
   | TShr
   deriving (Eq, Show)
+
+type TokenP = (Token, Position)
+
+place :: Position -> Token -> TokenP
+place p t = (t, p)
+
+fromToken :: TokenP -> Token
+fromToken = fst
 
 data Token
   = Ident String
@@ -61,8 +72,8 @@ data LexError
   deriving (Eq, Show)
 
 data ParseError
-  = Expect TokenKind (Maybe Token)
-  | ExpectToken Token (Maybe Token)
+  = Expect TokenKind (Maybe TokenP)
+  | ExpectToken Token (Maybe TokenP)
   deriving (Eq, Show)
 
 data TokenKind
@@ -78,6 +89,9 @@ newtype Position = Position { getPosition :: (Int, Int) }
 
 position :: Position
 position = Position (1, 1)
+
+newPosition :: Int -> Int -> Position
+newPosition l c = Position (l, c)
 
 mapPosition :: ((Int, Int) -> (Int, Int)) -> Position -> Position
 mapPosition f = Position . f . getPosition
@@ -136,7 +150,7 @@ while f = satisfy f >>= maybe (return []) (\x -> (x :) <$> while f)
 
 type Lexer = ExceptT LexError Stream
 
-newtype Parser a = Parser { runParser :: [Token] -> Either ParseError (Maybe (a, [Token])) }
+newtype Parser a = Parser { runParser :: [TokenP] -> Either ParseError (Maybe (a, [TokenP])) }
 
 instance Functor Parser where
   fmap f (Parser p) = Parser p'
@@ -164,30 +178,30 @@ instance Alternative Parser where
     where
       p ts = p1 ts >>= maybe (p2 ts) (Right . Just)
 
-lex1 :: Lexer (Maybe Token)
+lex1 :: Lexer (Maybe TokenP)
 lex1 = flip runKleisli () $ liftS getPos &&& liftS char >>> Kleisli g
   where
     liftS = Kleisli . const . lift
 
-    g :: (Position, Maybe Char) -> Lexer (Maybe Token)
+    g :: (Position, Maybe Char) -> Lexer (Maybe TokenP)
     g (p, m) = maybe (return Nothing) (f p) m
 
     f p x | isDigit x      = lexWord p x
     f p x | isAsciiAlpha x = lift (while isAlphanum) >>= fmap Just . lexLetters p . (x :)
     f _ ' '                = lex1
-    f _ '\n'               = return $ Just Newline
-    f _ ':'                = return $ Just Colon
+    f p '\n'               = return $ Just (Newline, p)
+    f p ':'                = return $ Just (Colon, p)
     f _ '%'                = lift (while (/= '\n')) >> lex1
     f p x                  = throwE $ IllegalChar x p
 
 -- Precondition: @isDigit x@ must hold.
-lexWord :: Position -> Char -> Lexer (Maybe Token)
+lexWord :: Position -> Char -> Lexer (Maybe TokenP)
 lexWord p x = do
   s <- lift $ while isDigit
   b <- lift notFollowedByLetter
   unless b $
     lift getPos >>= throwE . FollowedByAlpha (x : s)
-  fmap (Just . Digits) $ lexDigits p (x : s) >>= validImm32 p
+  fmap (Just . place p . Digits) $ lexDigits p (x : s) >>= validImm32 p
 
 -- Precondition: @n >= 0@ must hold.
 validImm32 :: Position -> Integer -> Lexer Word32
@@ -210,17 +224,17 @@ lexDigits _ "0"                 = return 0
 lexDigits _ (d : ds) | d /= '0' = return $ foldl (\x y -> x*10 + digitToWord y) (digitToWord d) ds
 lexDigits p _                   = throwE $ ZeroStartDigits p
 
-lexLetters :: Position -> String -> Lexer Token
+lexLetters :: Position -> String -> Lexer TokenP
 lexLetters p ('R' : ds) | let l = length ds, 0 < l, all isDigit ds =
   if l < 4
     then lexDigits p ds >>= f
     else throwE $ InvalidReg ds p
     where
-      f :: Word16 -> Lexer Token
+      f :: Word16 -> Lexer TokenP
       f w | w > 255 = throwE $ InvalidReg ds p
-      f w = return $ RegToken . fromInteger $ toInteger w
+      f w = return . place p $ RegToken . fromInteger $ toInteger w
 lexLetters p a @ (x : _) | isAsciiUpper x = throwE $ UpperNonReg a p
-lexLetters _ a = return $ f a
+lexLetters p a = return (f a, p)
   where
     f :: String -> Token
     f "mov" = Mnem TMov
@@ -242,7 +256,7 @@ isAsciiAlpha c = isAsciiUpper c || isAsciiLower c
 isAlphanum :: Char -> Bool
 isAlphanum c = isAsciiAlpha c || isDigit c
 
-lexer :: Lexer [Token]
+lexer :: Lexer [TokenP]
 lexer = lex1 >>= maybe (return []) (\t -> (t :) <$> lexer)
 
 mainParser :: String -> Either Error Program
@@ -257,26 +271,26 @@ mainParser' s = do
 exactSkip :: Token -> Parser ()
 exactSkip x = Parser f
   where
-    f (t : ts) | t == x = Right $ Just ((), ts)
+    f (t : ts) | fromToken t == x = Right $ Just ((), ts)
     f (t : ts) = Left . ExpectToken x $ Just t
     f [] = Left $ ExpectToken x Nothing
 
 option :: Token -> Parser ()
 option x = Parser f
   where
-    f (t : ts) | t == x = Right $ Just ((), ts)
+    f (t : ts) | fromToken t == x = Right $ Just ((), ts)
     f (t : ts) = Right Nothing
     f [] = Right Nothing
 
 predExact :: (Token -> Maybe a) -> TokenKind -> Parser a
 predExact p k = Parser f
   where
-    f (t : ts) = case p t of
+    f (t : ts) = case p $ fromToken t of
       (Just x) -> Right $ Just (x, ts)
       Nothing -> Left $ Expect k $ Just t
     f [] = Left $ Expect k Nothing
 
-predEOF :: (Token -> Either ParseError a) -> Parser a
+predEOF :: (TokenP -> Either ParseError a) -> Parser a
 predEOF p = Parser f
   where
     f (t : ts) = Just . (\a -> (a, ts)) <$> p t
@@ -285,7 +299,7 @@ predEOF p = Parser f
 predOption :: (Token -> Maybe a) -> Parser a
 predOption p = Parser f
   where
-    f (t : ts) = Right $ (\a -> (a, ts)) <$> p t
+    f (t : ts) = Right $ (\a -> (a, ts)) <$> p (fromToken t)
     f [] = Right Nothing
 
 skipMany :: Alternative f => f a -> f ()
@@ -308,7 +322,7 @@ block = Block <$> label <*> many (break *> inst) <*> (break *> jmp)
 label :: Parser String
 label = predEOF p <* exactSkip Colon
   where
-    p (Ident s) = Right s -- FIXME: avoid mnemonics.
+    p (Ident s, _) = Right s -- FIXME: avoid mnemonics.
     p t = Left $ Expect LabelLit $ Just t
 
 jmp :: Parser String
@@ -346,7 +360,7 @@ inst3op f = f <$> reg <*> operand <*> operand
 reg :: Parser Reg
 reg = predEOF f
   where
-    f (RegToken w) = return $ Reg w
+    f (RegToken w, _) = return $ Reg w
     f t = Left $ Expect RegisterLit $ return t
 
 operand :: Parser Operand

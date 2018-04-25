@@ -28,31 +28,31 @@ spec = do
 
   describe "label" $ do
     it "parses a label" $ do
-      runParser label [Ident "main", Colon] `shouldBe` return (Just ("main", []))
+      runParser label [(Ident "main", newPosition 1 1), (Colon, newPosition 1 1)] `shouldBe` return (Just ("main", []))
 
   describe "jmp" $ do
     it "parses a jump instruction" $ do
-      runParser jmp [Ident "jmp", Ident "L1"] `shouldBe` return (Just ("L1", []))
+      runParser jmp [(Ident "jmp", newPosition 1 1), (Ident "L1", newPosition 1 1)] `shouldBe` return (Just ("L1", []))
 
   describe "inst" $ do
     it "parses a instruction" $ do
       runParser inst [] `shouldBe` return Nothing
-      runParser inst [Mnem TMov, RegToken 0, Digits 1] `shouldBe` return (Just (Reg 0 `Mov` word 1, []))
+      runParser inst [(Mnem TMov, newPosition 1 1), (RegToken 0, newPosition 1 1), (Digits 1, newPosition 1 1)] `shouldBe` return (Just (Reg 0 `Mov` word 1, []))
 
   describe "reg" $
     it "parses a register" $ do
-      runParser reg [RegToken 0]             `shouldBe` return (Just (Reg 0, []))
-      runParser reg [RegToken 0, RegToken 1] `shouldBe` return (Just (Reg 0, [RegToken 1]))
+      runParser reg [(RegToken 0, newPosition 1 1)]             `shouldBe` return (Just (Reg 0, []))
+      runParser reg [(RegToken 0, newPosition 1 1), (RegToken 1, newPosition 1 7)] `shouldBe` return (Just (Reg 0, [(RegToken 1, newPosition 1 7)]))
 
   describe "lex1" $
     it "lex a token" $ do
       runLexer lex1 ""          `shouldBe` return (Nothing)
-      runLexer lex1 "R0"        `shouldBe` return (Just $ RegToken 0)
-      runLexer lex1 " R1"       `shouldBe` return (Just $ RegToken 1)
-      runLexer lex1 "R0 R1"     `shouldBe` return (Just $ RegToken 0)
-      runLexer lex1 "mov R0 R1" `shouldBe` return (Just $ Mnem TMov)
+      runLexer lex1 "R0"        `shouldBe` return (Just (RegToken 0, newPosition 1 1))
+      runLexer lex1 " R1"       `shouldBe` return (Just (RegToken 1, newPosition 1 2))
+      runLexer lex1 "R0 R1"     `shouldBe` return (Just (RegToken 0, newPosition 1 1))
+      runLexer lex1 "mov R0 R1" `shouldBe` return (Just (Mnem TMov, newPosition 1 1))
 
-      runLexer lex1 "R255"  `shouldBe` return (Just $ RegToken 255)
+      runLexer lex1 "R255"  `shouldBe` return (Just (RegToken 255, newPosition 1 1))
       runLexer lex1 "R256"  `shouldSatisfy` isLeft
       runLexer lex1 "R2560" `shouldSatisfy` isLeft
 
@@ -64,7 +64,7 @@ spec = do
   describe "lexer" $
     it "lex tokens" $ do
       runLexer lexer ""          `shouldBe` return []
-      runLexer lexer "R0"        `shouldBe` return [RegToken 0]
-      runLexer lexer " R1"       `shouldBe` return [RegToken 1]
-      runLexer lexer "R0 R1"     `shouldBe` return [RegToken 0, RegToken 1]
-      runLexer lexer "mov R0 R1" `shouldBe` return [Mnem TMov, RegToken 0, RegToken 1]
+      runLexer lexer "R0"        `shouldBe` return [(RegToken 0, newPosition 1 1)]
+      runLexer lexer " R1"       `shouldBe` return [(RegToken 1, newPosition 1 2)]
+      runLexer lexer "R0 R1"     `shouldBe` return [(RegToken 0, newPosition 1 1), (RegToken 1, newPosition 1 4)]
+      runLexer lexer "mov R0 R1" `shouldBe` return [(Mnem TMov, newPosition 1 1), (RegToken 0, newPosition 1 5), (RegToken 1, newPosition 1 8)]
