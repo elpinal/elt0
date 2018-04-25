@@ -37,7 +37,7 @@ spec = do
   describe "inst" $ do
     it "parses a instruction" $ do
       runParser inst [] `shouldBe` return Nothing
-      runParser inst [Ident "mov", RegToken 0, Digits 1] `shouldBe` return (Just (Reg 0 `Mov` word 1, []))
+      runParser inst [Mnem TMov, RegToken 0, Digits 1] `shouldBe` return (Just (Reg 0 `Mov` word 1, []))
 
   describe "reg" $
     it "parses a register" $ do
@@ -50,7 +50,7 @@ spec = do
       runLexer lex1 "R0"        `shouldBe` return (Just $ RegToken 0)
       runLexer lex1 " R1"       `shouldBe` return (Just $ RegToken 1)
       runLexer lex1 "R0 R1"     `shouldBe` return (Just $ RegToken 0)
-      runLexer lex1 "mov R0 R1" `shouldBe` return (Just $ Ident "mov")
+      runLexer lex1 "mov R0 R1" `shouldBe` return (Just $ Mnem TMov)
 
       runLexer lex1 "R255"  `shouldBe` return (Just $ RegToken 255)
       runLexer lex1 "R256"  `shouldSatisfy` isLeft
@@ -67,4 +67,4 @@ spec = do
       runLexer lexer "R0"        `shouldBe` return [RegToken 0]
       runLexer lexer " R1"       `shouldBe` return [RegToken 1]
       runLexer lexer "R0 R1"     `shouldBe` return [RegToken 0, RegToken 1]
-      runLexer lexer "mov R0 R1" `shouldBe` return [Ident "mov", RegToken 0, RegToken 1]
+      runLexer lexer "mov R0 R1" `shouldBe` return [Mnem TMov, RegToken 0, RegToken 1]

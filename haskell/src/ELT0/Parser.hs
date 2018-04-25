@@ -10,6 +10,7 @@ module ELT0.Parser
   , lexer
   , lex1
   , Token(..)
+  , Mnemonic(..)
   ) where
 
 import Control.Applicative
@@ -23,8 +24,20 @@ import Data.Word
 
 import ELT0.Program
 
+data Mnemonic
+  = TMov
+  | TAdd
+  | TSub
+  | TAnd
+  | TOr
+  | TNot
+  | TShl
+  | TShr
+  deriving (Eq, Show)
+
 data Token
   = Ident String
+  | Mnem Mnemonic
   | Digits Word32 -- not followed by alphabets.
   -- | Zero -- not followed by alphanum.
   | Newline
@@ -207,7 +220,18 @@ lexLetters p ('R' : ds) | let l = length ds, 0 < l, all isDigit ds =
       f w | w > 255 = throwE $ InvalidReg ds p
       f w = return $ RegToken . fromInteger $ toInteger w
 lexLetters p a @ (x : _) | isAsciiUpper x = throwE $ UpperNonReg a p
-lexLetters _ a = return $ Ident a
+lexLetters _ a = return $ f a
+  where
+    f :: String -> Token
+    f "mov" = Mnem TMov
+    f "add" = Mnem TAdd
+    f "sub" = Mnem TSub
+    f "and" = Mnem TAnd
+    f "or"  = Mnem TOr
+    f "not" = Mnem TNot
+    f "shl" = Mnem TShl
+    f "shr" = Mnem TShr
+    f a = Ident a
 
 digitToWord :: Num a => Char -> a
 digitToWord = fromInteger . toInteger . digitToInt
@@ -300,19 +324,18 @@ inst :: Parser Inst
 inst = join $ predOption p
   where
     p :: Token -> Maybe (Parser Inst)
-    p (Ident s) = f s
+    p (Mnem m) = Just $ f m
     p _ = Nothing
 
-    f :: String -> Maybe (Parser Inst)
-    f "mov" = Just $ inst2op Mov
-    f "add" = Just $ inst3op Add
-    f "sub" = Just $ inst3op Sub
-    f "and" = Just $ inst3op And
-    f "or"  = Just $ inst3op Or
-    f "not" = Just $ inst2op Not
-    f "shl" = Just $ inst3op Shl
-    f "shr" = Just $ inst3op Shr
-    f x     = Nothing
+    f :: Mnemonic -> Parser Inst
+    f TMov = inst2op Mov
+    f TAdd = inst3op Add
+    f TSub = inst3op Sub
+    f TAnd = inst3op And
+    f TOr  = inst3op Or
+    f TNot = inst2op Not
+    f TShl = inst3op Shl
+    f TShr = inst3op Shr
 
 inst2op :: (Reg -> Operand -> a) -> Parser a
 inst2op f = f <$> reg <*> operand
