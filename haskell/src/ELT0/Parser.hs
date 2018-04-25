@@ -2,6 +2,9 @@ module ELT0.Parser
   ( mainParser
   , runParser
   , runLexer
+  , inst
+  , jmp
+  , label
   , reg
   , operand
   , lexer
@@ -285,8 +288,11 @@ label = predEOF p <* exactSkip Colon
     p t = Left $ Expect LabelLit $ Just t
 
 jmp :: Parser String
-jmp = predExact p LabelLit
+jmp = predExact op Mnemonic *> predExact p LabelLit
   where
+    op (Ident "jmp") = Just ()
+    op _ = Nothing
+
     p (Ident s) = Just s -- FIXME: avoid mnemonics.
     p t = Nothing
 
