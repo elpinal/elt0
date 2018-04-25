@@ -67,7 +67,7 @@ display' (Shr r o1 o2) = ["shr", display r, display o1, display o2]
 instance Display Block where
   display (Block l is jl) = l ++ ":\n" ++
                             foldr (\i s -> display i ++ "\n" ++ s) "" is
-                            ++ "\njmp " ++ jl
+                            ++ "jmp " ++ jl
 
 instance Display Program where
-  display (Program bs) = foldr (\b s -> display b ++ "\n" ++ s) "" bs
+  display (Program bs) = foldr (\b s -> display b ++ "\n\n" ++ s) "" bs
