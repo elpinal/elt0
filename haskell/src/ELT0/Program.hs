@@ -36,7 +36,7 @@ data Inst
 newtype Program = Program [Block]
   deriving (Eq, Show)
 
-data Block = Block String [Inst] String
+data Block = Block String [Inst] Operand
   deriving (Eq, Show)
 
 class Display a where
@@ -67,9 +67,9 @@ display' (Shl r o1 o2) = ["shl", display r, display o1, display o2]
 display' (Shr r o1 o2) = ["shr", display r, display o1, display o2]
 
 instance Display Block where
-  display (Block l is jl) = l ++ ":\n" ++
-                            foldr (\i s -> display i ++ "\n" ++ s) "" is
-                            ++ "jmp " ++ jl
+  display (Block l is d) = l ++ ":\n" ++
+                           foldr (\i s -> display i ++ "\n" ++ s) "" is
+                           ++ "jmp " ++ display d
 
 instance Display Program where
   display (Program bs) = foldr (\b s -> display b ++ "\n\n" ++ s) "" bs

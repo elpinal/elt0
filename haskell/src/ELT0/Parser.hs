@@ -329,14 +329,11 @@ label = predEOF p <* exactSkip Colon
     p (Ident s, _) = Right s
     p t = Left $ Expect LabelLit $ Just t
 
-jmp :: Parser String
-jmp = predExact op Mnemonic *> predExact p LabelLit
+jmp :: Parser Operand
+jmp = predExact op Mnemonic *> operandL
   where
     op Jmp = Just ()
     op _ = Nothing
-
-    p (Ident s) = Just s
-    p t = Nothing
 
 inst :: Parser Inst
 inst = join $ predOption p
