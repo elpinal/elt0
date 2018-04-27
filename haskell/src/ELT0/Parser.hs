@@ -41,8 +41,8 @@ data Mnemonic
 
 type TokenP = (Token, Position)
 
-place :: Position -> Token -> TokenP
-place p t = (t, p)
+at :: Position -> Token -> TokenP
+at p t = (t, p)
 
 fromToken :: TokenP -> Token
 fromToken = fst
@@ -205,7 +205,7 @@ lexWord p x = do
   b <- lift notFollowedByLetter
   unless b $
     lift getPos >>= throwE . FollowedByAlpha (x : s)
-  fmap (Just . place p . Digits) $ lexDigits p (x : s) >>= validImm32 p
+  fmap (Just . at p . Digits) $ lexDigits p (x : s) >>= validImm32 p
 
 -- Precondition: @n >= 0@ must hold.
 validImm32 :: Position -> Integer -> Lexer Word32
@@ -236,7 +236,7 @@ lexLetters p ('R' : ds) | let l = length ds, 0 < l, all isDigit ds =
     where
       f :: Word16 -> Lexer TokenP
       f w | w > 255 = throwE $ InvalidReg ds p
-      f w = return . place p $ RegToken . fromInteger $ toInteger w
+      f w = return . at p $ RegToken . fromInteger $ toInteger w
 lexLetters p a @ (x : _) | isAsciiUpper x = throwE $ UpperNonReg a p
 lexLetters p a = return (f a, p)
   where
@@ -333,7 +333,7 @@ label = predEOF p <* exactSkip Colon
     p t = Left $ Expect LabelLit $ Just t
 
 jmp :: Parser Place
-jmp = predExact op Mnemonic *> placeQ
+jmp = predExact op Mnemonic *> place
   where
     op Jmp = Just ()
     op _ = Nothing
@@ -366,7 +366,7 @@ inst3opN :: (Reg -> Numeric -> Numeric -> a) -> Parser a
 inst3opN f = f <$> reg <*> numeric <*> numeric
 
 ifJmp :: Parser Inst
-ifJmp = If <$> (reg <* exactSkip Jmp) <*> placeQ
+ifJmp = If <$> (reg <* exactSkip Jmp) <*> place
 
 reg :: Parser Reg
 reg = predEOF f
@@ -381,8 +381,8 @@ numeric = predExact f Numeric
     f (RegToken w) = Just $ registerN w -- TODO: duplicate of `reg`.
     f t = Nothing
 
-placeQ :: Parser Place
-placeQ = predExact f Place
+place :: Parser Place
+place = predExact f Place
   where
     f (RegToken w) = Just $ registerP w -- TODO: duplicate of `reg`.
     f (Ident s) = Just $ labelP s
