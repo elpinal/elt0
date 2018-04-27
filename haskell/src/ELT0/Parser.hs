@@ -332,7 +332,7 @@ label = predEOF p <* exactSkip Colon
     p t = Left $ Expect LabelLit $ Just t
 
 jmp :: Parser Operand
-jmp = predExact op Mnemonic *> operandL
+jmp = predExact op Mnemonic *> operand
   where
     op Jmp = Just ()
     op _ = Nothing
@@ -345,27 +345,27 @@ inst = join $ predOption p
     p _ = Nothing
 
     f :: Mnemonic -> Parser Inst
-    f TMov = inst2opL Mov
-    f TAdd = inst3op Add
-    f TSub = inst3op Sub
-    f TAnd = inst3op And
-    f TOr  = inst3op Or
-    f TNot = inst2op Not
-    f TShl = inst3op Shl
-    f TShr = inst3op Shr
+    f TMov = inst2op Mov
+    f TAdd = inst3opN Add
+    f TSub = inst3opN Sub
+    f TAnd = inst3opN And
+    f TOr  = inst3opN Or
+    f TNot = inst2opN Not
+    f TShl = inst3opN Shl
+    f TShr = inst3opN Shr
     f TIf  = ifJmp
 
-inst2op :: (Reg -> Numeric -> a) -> Parser a
-inst2op f = f <$> reg <*> numeric
+inst2opN :: (Reg -> Numeric -> a) -> Parser a
+inst2opN f = f <$> reg <*> numeric
 
-inst2opL :: (Reg -> Operand -> a) -> Parser a
-inst2opL f = f <$> reg <*> operandL
+inst2op :: (Reg -> Operand -> a) -> Parser a
+inst2op f = f <$> reg <*> operand
 
-inst3op :: (Reg -> Numeric -> Numeric -> a) -> Parser a
-inst3op f = f <$> reg <*> numeric <*> numeric
+inst3opN :: (Reg -> Numeric -> Numeric -> a) -> Parser a
+inst3opN f = f <$> reg <*> numeric <*> numeric
 
 ifJmp :: Parser Inst
-ifJmp = If <$> (reg <* exactSkip Jmp) <*> operandL
+ifJmp = If <$> (reg <* exactSkip Jmp) <*> operand
 
 reg :: Parser Reg
 reg = predEOF f
@@ -380,8 +380,8 @@ numeric = predExact f Numeric
     f (RegToken w) = Just $ registerN w -- TODO: duplicate of `reg`.
     f t = Nothing
 
-operandL :: Parser Operand
-operandL = predExact f OperandL
+operand :: Parser Operand
+operand = predExact f OperandL
   where
     f (Digits w) = Just $ wordO w
     f (RegToken w) = Just $ Register $ Reg w -- TODO: duplicate of `reg`.
