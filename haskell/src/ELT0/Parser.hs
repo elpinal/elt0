@@ -36,6 +36,7 @@ data Mnemonic
   | TNot
   | TShl
   | TShr
+  | TIf
   deriving (Eq, Show)
 
 type TokenP = (Token, Position)
@@ -247,6 +248,7 @@ lexLetters p a = return (f a, p)
     f "not" = Mnem TNot
     f "shl" = Mnem TShl
     f "shr" = Mnem TShr
+    f "if"  = Mnem TIf
     f "jmp" = Jmp -- Notice that this is not Mnem.
     f a = Ident a
 
@@ -351,6 +353,7 @@ inst = join $ predOption p
     f TNot = inst2op Not
     f TShl = inst3op Shl
     f TShr = inst3op Shr
+    f TIf  = ifJmp
 
 inst2op :: (Reg -> Operand -> a) -> Parser a
 inst2op f = f <$> reg <*> operand
@@ -360,6 +363,9 @@ inst2opL f = f <$> reg <*> operandL
 
 inst3op :: (Reg -> Operand -> Operand -> a) -> Parser a
 inst3op f = f <$> reg <*> operand <*> operand
+
+ifJmp :: Parser Inst
+ifJmp = If <$> (reg <* exactSkip Jmp) <*> operandL
 
 reg :: Parser Reg
 reg = predEOF f

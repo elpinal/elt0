@@ -31,6 +31,7 @@ data Inst
   | Not Reg Operand
   | Shl Reg Operand Operand
   | Shr Reg Operand Operand
+  | If  Reg Operand
   deriving (Eq, Show)
 
 newtype Program = Program [Block]
@@ -65,6 +66,7 @@ display' (Or  r o1 o2) = ["or" , display r, display o1, display o2]
 display' (Not r o)     = ["not", display r, display o]
 display' (Shl r o1 o2) = ["shl", display r, display o1, display o2]
 display' (Shr r o1 o2) = ["shr", display r, display o1, display o2]
+display' (If r o)      = ["if" , display r, "jmp", display o]
 
 instance Display Block where
   display (Block l is d) = l ++ ":\n" ++
