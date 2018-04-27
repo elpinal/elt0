@@ -19,6 +19,7 @@ newtype Val = Word Word32
 data Operand
   = Register Reg
   | Value Val
+  | Label String
   deriving (Eq, Show)
 
 data Inst
@@ -50,6 +51,7 @@ instance Display Val where
 instance Display Operand where
   display (Register r) = display r
   display (Value v) = display v
+  display (Label s) = s
 
 instance Display Inst where
   display = foldl1 (\x y -> x ++ " " ++ y) . display'

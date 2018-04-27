@@ -80,7 +80,8 @@ data ParseError
 data TokenKind
   = Mnemonic
   | RegisterLit
-  | Operand
+  | OperandExceptLabel -- operands except labels, namely values and registers
+  | OperandL -- operands (including labels)
   | NewlineLit
   | LabelLit
   deriving (Eq, Show)
@@ -345,7 +346,7 @@ inst = join $ predOption p
     p _ = Nothing
 
     f :: Mnemonic -> Parser Inst
-    f TMov = inst2op Mov
+    f TMov = inst2opL Mov
     f TAdd = inst3op Add
     f TSub = inst3op Sub
     f TAnd = inst3op And
@@ -357,6 +358,9 @@ inst = join $ predOption p
 inst2op :: (Reg -> Operand -> a) -> Parser a
 inst2op f = f <$> reg <*> operand
 
+inst2opL :: (Reg -> Operand -> a) -> Parser a
+inst2opL f = f <$> reg <*> operandL
+
 inst3op :: (Reg -> Operand -> Operand -> a) -> Parser a
 inst3op f = f <$> reg <*> operand <*> operand
 
@@ -367,10 +371,18 @@ reg = predEOF f
     f t = Left $ Expect RegisterLit $ return t
 
 operand :: Parser Operand
-operand = predExact f Operand
+operand = predExact f OperandExceptLabel
   where
     f (Digits w) = Just $ Value $ Word w
     f (RegToken w) = Just $ Register $ Reg w -- TODO: duplicate of `reg`.
+    f t = Nothing
+
+operandL :: Parser Operand
+operandL = predExact f OperandL
+  where
+    f (Digits w) = Just $ Value $ Word w
+    f (RegToken w) = Just $ Register $ Reg w -- TODO: duplicate of `reg`.
+    f (Ident s) = Just $ Label s
     f t = Nothing
 
 runLexer :: Lexer a -> String -> Either LexError a
