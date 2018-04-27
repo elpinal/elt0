@@ -81,9 +81,9 @@ data ParseError
 data TokenKind
   = Mnemonic
   | RegisterLit
-  | Numeric -- operands except labels, namely values and registers
-  | Place -- labels and registers
-  | OperandL -- operands (including labels)
+  | Numeric -- operands except labels, namely words and registers
+  | Place   -- operands except words, namely labels and registers
+  | Operand
   | NewlineLit
   | LabelLit
   deriving (Eq, Show)
@@ -389,7 +389,7 @@ place = predExact f Place
     f t = Nothing
 
 operand :: Parser Operand
-operand = predExact f OperandL
+operand = predExact f Operand
   where
     f (Digits w) = Just $ wordO w
     f (RegToken w) = Just $ Register $ Reg w
