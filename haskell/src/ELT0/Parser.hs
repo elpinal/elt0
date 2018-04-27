@@ -378,13 +378,13 @@ numeric :: Parser Numeric
 numeric = predExact f Numeric
   where
     f (Digits w) = Just $ wordN w
-    f (RegToken w) = Just $ registerN w -- TODO: duplicate of `reg`.
+    f (RegToken w) = Just $ registerN w
     f t = Nothing
 
 place :: Parser Place
 place = predExact f Place
   where
-    f (RegToken w) = Just $ registerP w -- TODO: duplicate of `reg`.
+    f (RegToken w) = Just $ registerP w
     f (Ident s) = Just $ labelP s
     f t = Nothing
 
@@ -392,7 +392,7 @@ operand :: Parser Operand
 operand = predExact f OperandL
   where
     f (Digits w) = Just $ wordO w
-    f (RegToken w) = Just $ Register $ Reg w -- TODO: duplicate of `reg`.
+    f (RegToken w) = Just $ Register $ Reg w
     f (Ident s) = Just $ labelO s
     f t = Nothing
 
