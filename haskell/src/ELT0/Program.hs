@@ -5,6 +5,7 @@ module ELT0.Program
   , Reg(..)
   , Operand(..)
   , Numeric(..)
+  , Place(..)
   , Val(..)
   , W(..)
   , Display(..)
@@ -12,6 +13,8 @@ module ELT0.Program
   , labelO
   , wordN
   , registerN
+  , labelP
+  , registerP
   ) where
 
 import Data.Word
@@ -37,6 +40,11 @@ data Numeric
   | NWord W
   deriving (Eq, Show)
 
+data Place
+  = PRegister Reg
+  | PLabel String
+  deriving (Eq, Show)
+
 data Inst
   = Mov Reg Operand
   | Add Reg Numeric Numeric
@@ -46,13 +54,13 @@ data Inst
   | Not Reg Numeric
   | Shl Reg Numeric Numeric
   | Shr Reg Numeric Numeric
-  | If  Reg Operand
+  | If  Reg Place
   deriving (Eq, Show)
 
 newtype Program = Program [Block]
   deriving (Eq, Show)
 
-data Block = Block String [Inst] Operand
+data Block = Block String [Inst] Place
   deriving (Eq, Show)
 
 class Display a where
@@ -76,6 +84,10 @@ instance Display Val where
   display (Word w) = display w
   display (Label s) = s
 
+instance Display Place where
+  display (PRegister r) = display r
+  display (PLabel s) = s
+
 instance Display Inst where
   display = foldl1 (\x y -> x ++ " " ++ y) . display'
 
@@ -88,12 +100,12 @@ display' (Or  r o1 o2) = ["or" , display r, display o1, display o2]
 display' (Not r o)     = ["not", display r, display o]
 display' (Shl r o1 o2) = ["shl", display r, display o1, display o2]
 display' (Shr r o1 o2) = ["shr", display r, display o1, display o2]
-display' (If r o)      = ["if" , display r, "jmp", display o]
+display' (If r p)      = ["if" , display r, "jmp", display p]
 
 instance Display Block where
-  display (Block l is d) = l ++ ":\n" ++
+  display (Block l is p) = l ++ ":\n" ++
                            foldr (\i s -> display i ++ "\n" ++ s) "" is
-                           ++ "jmp " ++ display d
+                           ++ "jmp " ++ display p
 
 instance Display Program where
   display (Program bs) = foldr (\b s -> display b ++ "\n\n" ++ s) "" bs
@@ -109,3 +121,9 @@ wordN = NWord . W
 
 registerN :: Word8 -> Numeric
 registerN = NRegister . Reg
+
+labelP :: String -> Place
+labelP = PLabel
+
+registerP :: Word8 -> Place
+registerP = PRegister . Reg

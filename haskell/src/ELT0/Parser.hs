@@ -82,6 +82,7 @@ data TokenKind
   = Mnemonic
   | RegisterLit
   | Numeric -- operands except labels, namely values and registers
+  | Place -- labels and registers
   | OperandL -- operands (including labels)
   | NewlineLit
   | LabelLit
@@ -331,8 +332,8 @@ label = predEOF p <* exactSkip Colon
     p (Ident s, _) = Right s
     p t = Left $ Expect LabelLit $ Just t
 
-jmp :: Parser Operand
-jmp = predExact op Mnemonic *> operand
+jmp :: Parser Place
+jmp = predExact op Mnemonic *> placeQ
   where
     op Jmp = Just ()
     op _ = Nothing
@@ -365,7 +366,7 @@ inst3opN :: (Reg -> Numeric -> Numeric -> a) -> Parser a
 inst3opN f = f <$> reg <*> numeric <*> numeric
 
 ifJmp :: Parser Inst
-ifJmp = If <$> (reg <* exactSkip Jmp) <*> operand
+ifJmp = If <$> (reg <* exactSkip Jmp) <*> placeQ
 
 reg :: Parser Reg
 reg = predEOF f
@@ -378,6 +379,13 @@ numeric = predExact f Numeric
   where
     f (Digits w) = Just $ wordN w
     f (RegToken w) = Just $ registerN w -- TODO: duplicate of `reg`.
+    f t = Nothing
+
+placeQ :: Parser Place
+placeQ = predExact f Place
+  where
+    f (RegToken w) = Just $ registerP w -- TODO: duplicate of `reg`.
+    f (Ident s) = Just $ labelP s
     f t = Nothing
 
 operand :: Parser Operand
