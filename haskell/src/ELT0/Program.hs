@@ -4,11 +4,14 @@ module ELT0.Program
   , Inst(..)
   , Reg(..)
   , Operand(..)
+  , Numeric(..)
   , Val(..)
   , W(..)
   , Display(..)
   , wordO
   , labelO
+  , wordN
+  , registerN
   ) where
 
 import Data.Word
@@ -29,15 +32,20 @@ data Operand
   | Value Val
   deriving (Eq, Show)
 
+data Numeric
+  = NRegister Reg
+  | NWord W
+  deriving (Eq, Show)
+
 data Inst
   = Mov Reg Operand
-  | Add Reg Operand Operand
-  | Sub Reg Operand Operand
-  | And Reg Operand Operand
-  | Or  Reg Operand Operand
-  | Not Reg Operand
-  | Shl Reg Operand Operand
-  | Shr Reg Operand Operand
+  | Add Reg Numeric Numeric
+  | Sub Reg Numeric Numeric
+  | And Reg Numeric Numeric
+  | Or  Reg Numeric Numeric
+  | Not Reg Numeric
+  | Shl Reg Numeric Numeric
+  | Shr Reg Numeric Numeric
   | If  Reg Operand
   deriving (Eq, Show)
 
@@ -59,6 +67,10 @@ instance Display W where
 instance Display Operand where
   display (Register r) = display r
   display (Value v) = display v
+
+instance Display Numeric where
+  display (NRegister r) = display r
+  display (NWord w) = display w
 
 instance Display Val where
   display (Word w) = display w
@@ -91,3 +103,9 @@ wordO = Value . Word . W
 
 labelO :: String -> Operand
 labelO = Value . Label
+
+wordN :: Word32 -> Numeric
+wordN = NWord . W
+
+registerN :: Word8 -> Numeric
+registerN = NRegister . Reg

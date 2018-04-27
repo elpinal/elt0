@@ -81,7 +81,7 @@ data ParseError
 data TokenKind
   = Mnemonic
   | RegisterLit
-  | OperandExceptLabel -- operands except labels, namely values and registers
+  | Numeric -- operands except labels, namely values and registers
   | OperandL -- operands (including labels)
   | NewlineLit
   | LabelLit
@@ -355,13 +355,13 @@ inst = join $ predOption p
     f TShr = inst3op Shr
     f TIf  = ifJmp
 
-inst2op :: (Reg -> Operand -> a) -> Parser a
+inst2op :: (Reg -> Numeric -> a) -> Parser a
 inst2op f = f <$> reg <*> operand
 
 inst2opL :: (Reg -> Operand -> a) -> Parser a
 inst2opL f = f <$> reg <*> operandL
 
-inst3op :: (Reg -> Operand -> Operand -> a) -> Parser a
+inst3op :: (Reg -> Numeric -> Numeric -> a) -> Parser a
 inst3op f = f <$> reg <*> operand <*> operand
 
 ifJmp :: Parser Inst
@@ -373,11 +373,11 @@ reg = predEOF f
     f (RegToken w, _) = return $ Reg w
     f t = Left $ Expect RegisterLit $ return t
 
-operand :: Parser Operand
-operand = predExact f OperandExceptLabel
+operand :: Parser Numeric
+operand = predExact f Numeric
   where
-    f (Digits w) = Just $ wordO w
-    f (RegToken w) = Just $ Register $ Reg w -- TODO: duplicate of `reg`.
+    f (Digits w) = Just $ wordN w
+    f (RegToken w) = Just $ registerN w -- TODO: duplicate of `reg`.
     f t = Nothing
 
 operandL :: Parser Operand
