@@ -6,7 +6,7 @@ module ELT0.Parser
   , jmp
   , label
   , reg
-  , operand
+  , numeric
   , lexer
   , lex1
   , Token(..)
@@ -356,13 +356,13 @@ inst = join $ predOption p
     f TIf  = ifJmp
 
 inst2op :: (Reg -> Numeric -> a) -> Parser a
-inst2op f = f <$> reg <*> operand
+inst2op f = f <$> reg <*> numeric
 
 inst2opL :: (Reg -> Operand -> a) -> Parser a
 inst2opL f = f <$> reg <*> operandL
 
 inst3op :: (Reg -> Numeric -> Numeric -> a) -> Parser a
-inst3op f = f <$> reg <*> operand <*> operand
+inst3op f = f <$> reg <*> numeric <*> numeric
 
 ifJmp :: Parser Inst
 ifJmp = If <$> (reg <* exactSkip Jmp) <*> operandL
@@ -373,8 +373,8 @@ reg = predEOF f
     f (RegToken w, _) = return $ Reg w
     f t = Left $ Expect RegisterLit $ return t
 
-operand :: Parser Numeric
-operand = predExact f Numeric
+numeric :: Parser Numeric
+numeric = predExact f Numeric
   where
     f (Digits w) = Just $ wordN w
     f (RegToken w) = Just $ registerN w -- TODO: duplicate of `reg`.
