@@ -4,8 +4,11 @@ module ELT0.Program
   , Inst(..)
   , Reg(..)
   , Operand(..)
+  , Val(..)
   , W(..)
   , Display(..)
+  , wordO
+  , labelO
   ) where
 
 import Data.Word
@@ -16,10 +19,14 @@ newtype Reg = Reg Word8
 newtype W = W Word32
   deriving (Eq, Show)
 
+data Val
+  = Word W
+  | Label String
+  deriving (Eq, Show)
+
 data Operand
   = Register Reg
-  | Word W
-  | Label String
+  | Value Val
   deriving (Eq, Show)
 
 data Inst
@@ -51,6 +58,9 @@ instance Display W where
 
 instance Display Operand where
   display (Register r) = display r
+  display (Value v) = display v
+
+instance Display Val where
   display (Word w) = display w
   display (Label s) = s
 
@@ -75,3 +85,9 @@ instance Display Block where
 
 instance Display Program where
   display (Program bs) = foldr (\b s -> display b ++ "\n\n" ++ s) "" bs
+
+wordO :: Word32 -> Operand
+wordO = Value . Word . W
+
+labelO :: String -> Operand
+labelO = Value . Label
