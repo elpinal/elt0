@@ -4,7 +4,7 @@ module ELT0.Program
   , Inst(..)
   , Reg(..)
   , Operand(..)
-  , Val(..)
+  , W(..)
   , Display(..)
   ) where
 
@@ -13,12 +13,12 @@ import Data.Word
 newtype Reg = Reg Word8
   deriving (Eq, Show)
 
-newtype Val = Word Word32
+newtype W = W Word32
   deriving (Eq, Show)
 
 data Operand
   = Register Reg
-  | Value Val
+  | Word W
   | Label String
   deriving (Eq, Show)
 
@@ -46,12 +46,12 @@ class Display a where
 instance Display Reg where
   display (Reg n) = 'R' : show n
 
-instance Display Val where
-  display (Word w) = show w
+instance Display W where
+  display (W w) = show w
 
 instance Display Operand where
   display (Register r) = display r
-  display (Value v) = display v
+  display (Word w) = display w
   display (Label s) = s
 
 instance Display Inst where

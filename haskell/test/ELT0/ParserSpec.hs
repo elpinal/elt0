@@ -9,7 +9,7 @@ import ELT0.Program
 
 spec :: Spec
 spec = do
-  let word = Value . Word
+  let word = Word . W
 
   describe "mainParser" $ do
     it "parses a program" $ do

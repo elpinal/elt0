@@ -376,14 +376,14 @@ reg = predEOF f
 operand :: Parser Operand
 operand = predExact f OperandExceptLabel
   where
-    f (Digits w) = Just $ Value $ Word w
+    f (Digits w) = Just $ Word $ W w
     f (RegToken w) = Just $ Register $ Reg w -- TODO: duplicate of `reg`.
     f t = Nothing
 
 operandL :: Parser Operand
 operandL = predExact f OperandL
   where
-    f (Digits w) = Just $ Value $ Word w
+    f (Digits w) = Just $ Word $ W w
     f (RegToken w) = Just $ Register $ Reg w -- TODO: duplicate of `reg`.
     f (Ident s) = Just $ Label s
     f t = Nothing
