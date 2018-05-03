@@ -1,7 +1,8 @@
 {-# LANGUAGE BinaryLiterals #-}
 
 module ELT0.Eval
-  (
+  ( run
+  , code
   ) where
 
 import Control.Monad
@@ -39,6 +40,9 @@ type Code = (UArray Word32 Word8, Offset)
 
 type Evaluator = StateT (Code, File) Maybe
 
+code :: [Word8] -> Code
+code l = (listArray (1, fromInteger . toInteger $ length l) l, 1)
+
 getCur :: Code -> Word8
 getCur (a, o) = a ! o
 
@@ -73,8 +77,20 @@ getShiftNext i = getShift i <* next
 testNext :: Int -> Evaluator Bool
 testNext i = flip testBit i <$> getByteNext
 
+run :: Code -> Maybe File
+run c = snd . snd <$> evalc eval c
+
+evalc :: Evaluator a -> Code -> Maybe (a, (Code, File))
+evalc e c = runEval e (c, Map.empty)
+
+runEval :: Evaluator a -> (Code, File) -> Maybe (a, (Code, File))
+runEval e s = runStateT e s
+
 eval :: Evaluator ()
-eval = getMask 0b11111 >>= f
+eval = forever eval1
+
+eval1 :: Evaluator ()
+eval1 = getMask 0b11111 >>= f
   where
     f :: Word8 -> Evaluator ()
     f 0 = mov
