@@ -1,9 +1,5 @@
 *.satysfi-aux
 
-/target/
-**/*.rs.bk
-Cargo.lock
-
-/haskell/**/.stack-work/
-/haskell/**/elt0.cabal
-/haskell/**/*~
+/**/.stack-work/
+/**/elt0.cabal
+/**/*~
