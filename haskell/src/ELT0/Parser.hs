@@ -22,6 +22,7 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Data.Char
+import Data.Functor
 import Data.Functor.Identity
 import Data.Word
 
@@ -51,6 +52,7 @@ data Token
   = Ident String
   | Mnem Mnemonic
   | Jmp
+  | Halt
   | Digits Word32 -- not followed by alphabets.
   -- | Zero -- not followed by alphanum.
   | Newline
@@ -241,16 +243,17 @@ lexLetters p a @ (x : _) | isAsciiUpper x = throwE $ UpperNonReg a p
 lexLetters p a = return (f a, p)
   where
     f :: String -> Token
-    f "mov" = Mnem TMov
-    f "add" = Mnem TAdd
-    f "sub" = Mnem TSub
-    f "and" = Mnem TAnd
-    f "or"  = Mnem TOr
-    f "not" = Mnem TNot
-    f "shl" = Mnem TShl
-    f "shr" = Mnem TShr
-    f "if"  = Mnem TIf
-    f "jmp" = Jmp -- Notice that this is not Mnem.
+    f "mov"  = Mnem TMov
+    f "add"  = Mnem TAdd
+    f "sub"  = Mnem TSub
+    f "and"  = Mnem TAnd
+    f "or"   = Mnem TOr
+    f "not"  = Mnem TNot
+    f "shl"  = Mnem TShl
+    f "shr"  = Mnem TShr
+    f "if"   = Mnem TIf
+    f "jmp"  = Jmp -- Notice that this is not Mnem.
+    f "halt" = Halt
     f a = Ident a
 
 digitToWord :: Num a => Char -> a
@@ -322,7 +325,7 @@ parser = space *> p <* space
     break = skipSome $ option Newline
 
 block :: Parser Block
-block = Block <$> label <*> many (break *> inst) <*> (break *> jmp)
+block = Block <$> label <*> many (break *> inst) <*> (break *> end)
   where
     break = skipSome $ option Newline
 
@@ -331,6 +334,15 @@ label = predEOF p <* exactSkip Colon
   where
     p (Ident s, _) = Right s
     p t = Left $ Expect LabelLit $ Just t
+
+end :: Parser (Maybe Place)
+end = (halt $> Nothing) <|> (Just <$> jmp)
+
+halt :: Parser ()
+halt = predOption op
+  where
+    op Halt = Just ()
+    op _ = Nothing
 
 jmp :: Parser Place
 jmp = predExact op Mnemonic *> place

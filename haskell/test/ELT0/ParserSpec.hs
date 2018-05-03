@@ -12,15 +12,18 @@ spec = do
   describe "mainParser" $ do
     it "parses a program" $ do
       let prog = return . Program
+      let jmpTo = Just . labelP
 
       mainParser ""  `shouldBe` prog []
       mainParser " " `shouldBe` prog []
 
-      mainParser "main:\n jmp main"   `shouldBe` prog [Block "main" [] $ labelP "main"]
-      mainParser "main:\n jmp main\n" `shouldBe` prog [Block "main" [] $ labelP "main"]
+      mainParser "main:\n jmp main"   `shouldBe` prog [Block "main" [] $ jmpTo "main"]
+      mainParser "main:\n jmp main\n" `shouldBe` prog [Block "main" [] $ jmpTo "main"]
       -- mainParser "main: jmp main" `shouldSatisfy` isLeft
-      mainParser "main:\n mov R0 1\n jmp next"             `shouldBe` prog [Block "main" [Reg 0 `Mov` wordO 1] $ labelP "next"]
-      mainParser "x:\nshr R255 1000 288\nnot R0 0\n jmp a" `shouldBe` prog [Block "x" [Shr (Reg 255) (wordN 1000) (wordN 288), Reg 0 `Not` wordN 0] $ labelP "a"]
+      mainParser "main:\n halt" `shouldBe` prog [Block "main" [] Nothing]
+
+      mainParser "main:\n mov R0 1\n jmp next"             `shouldBe` prog [Block "main" [Reg 0 `Mov` wordO 1] $ jmpTo "next"]
+      mainParser "x:\nshr R255 1000 288\nnot R0 0\n jmp a" `shouldBe` prog [Block "x" [Shr (Reg 255) (wordN 1000) (wordN 288), Reg 0 `Not` wordN 0] $ jmpTo "a"]
 
       mainParser "L1:\n jmp main"  `shouldSatisfy` isLeft -- labels must not start in upper case. 
       mainParser "mov:\n jmp main" `shouldSatisfy` isLeft -- labels is distinguished from mnemonics.
