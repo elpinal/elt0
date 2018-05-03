@@ -5,6 +5,7 @@ module ELT0.Eval
   ) where
 
 import Control.Monad
+import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Lazy
 import Data.Bifunctor
 import Data.Bits
@@ -26,11 +27,13 @@ import Data.Word
 --   * 6 -> shl
 --   * 7 -> shr
 --   * 8 -> if-jmp
+--   * 9 -> jmp
+--   * 10 -> halt
 -- * The next {n:int | 0 <= n && n <= 2 } bits specify operand-format.
 
 type File = Map.Map Word8 Word32
 
-type Evaluator = State (B.ByteString, File)
+type Evaluator = StateT (B.ByteString, File) Maybe
 
 getByte :: Evaluator Word8
 getByte = gets $ B.head . fst
@@ -62,6 +65,7 @@ eval = getMask 0b11111 >>= f
   where
     f :: Word8 -> Evaluator ()
     f 0 = mov
+    f 10 = halt
     -- 1 = add
     -- 2 = sub
     -- 3 = and
@@ -70,6 +74,7 @@ eval = getMask 0b11111 >>= f
     -- 6 = shl
     -- 7 = shr
     -- 8 = ifJmp
+    -- 9 = jmp
 
 modifyReg :: Word8 -> Word32 -> Evaluator ()
 modifyReg r v = modify $ second $ Map.insert r v
@@ -95,3 +100,7 @@ mov = do
       False -> getByteNext >>= getVal
       True  -> buildWord32 <$> replicateM 4 getByteNext
   modifyReg r v
+
+-- | 5 bits (10 in dec) | 3 bits (ignored)
+halt :: Evaluator ()
+halt = lift Nothing
