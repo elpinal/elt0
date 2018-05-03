@@ -5,8 +5,10 @@ module ELT0.Eval
   , code
   ) where
 
+import Control.Applicative
 import Control.Monad
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.State.Lazy
 import Data.Bifunctor
 import Data.Bits
@@ -38,7 +40,7 @@ type Offset = Word32
 
 type Code = (UArray Word32 Word8, Offset)
 
-type Evaluator = StateT (Code, File) Maybe
+type Evaluator = MaybeT (State (Code, File))
 
 code :: [Word8] -> Code
 code l = (listArray (1, fromInteger . toInteger $ length l) l, 1)
@@ -53,7 +55,7 @@ incOffset :: Code -> Code
 incOffset = second (+ 1)
 
 getByte :: Evaluator Word8
-getByte = gets $ getCur . fst
+getByte = lift $ gets $ getCur . fst
 
 getMask :: Word8 -> Evaluator Word8
 getMask m = (.&. m) <$> getByte
@@ -62,7 +64,7 @@ getShift :: Int -> Evaluator Word8
 getShift i = (`shift` i) <$> getByte
 
 next :: Evaluator ()
-next = modify $ first incOffset
+next = lift $ modify $ first incOffset
 
 getByteNext :: Evaluator Word8
 getByteNext = getByte <* next
@@ -77,14 +79,14 @@ getShiftNext i = getShift i <* next
 testNext :: Int -> Evaluator Bool
 testNext i = flip testBit i <$> getByteNext
 
-run :: Code -> Maybe File
-run c = snd . snd <$> evalc eval c
+run :: Code -> File
+run c = snd . snd $ evalc eval c
 
-evalc :: Evaluator a -> Code -> Maybe (a, (Code, File))
+evalc :: Evaluator a -> Code -> (Maybe a, (Code, File))
 evalc e c = runEval e (c, Map.empty)
 
-runEval :: Evaluator a -> (Code, File) -> Maybe (a, (Code, File))
-runEval e s = runStateT e s
+runEval :: Evaluator a -> (Code, File) -> (Maybe a, (Code, File))
+runEval e s = flip runState s $ runMaybeT e
 
 eval :: Evaluator ()
 eval = forever eval1
@@ -106,10 +108,10 @@ eval1 = getMask 0b11111 >>= f
     -- 9 = jmp
 
 modifyReg :: Word8 -> Word32 -> Evaluator ()
-modifyReg r v = modify $ second $ Map.insert r v
+modifyReg r v = lift $ modify $ second $ Map.insert r v
 
 getVal :: Word8 -> Evaluator Word32
-getVal r = gets $ (Map.! r) . snd
+getVal r = lift $ gets $ (Map.! r) . snd
 
 -- big endian
 buildWord32 :: [Word8] -> Word32
@@ -132,4 +134,4 @@ mov = do
 
 -- | 5 bits (10 in dec) | 3 bits (ignored)
 halt :: Evaluator ()
-halt = lift Nothing
+halt = empty
