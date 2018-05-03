@@ -9,7 +9,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Lazy
 import Data.Bifunctor
 import Data.Bits
-import qualified Data.ByteString.Lazy as B
+import Data.Array.Unboxed
 import qualified Data.Map.Lazy as Map
 import Data.Word
 
@@ -33,19 +33,32 @@ import Data.Word
 
 type File = Map.Map Word8 Word32
 
-type Evaluator = StateT (B.ByteString, File) Maybe
+type Offset = Word32
+
+type Code = (UArray Word32 Word8, Offset)
+
+type Evaluator = StateT (Code, File) Maybe
+
+getCur :: Code -> Word8
+getCur (a, o) = a ! o
+
+setOffset :: Offset -> Code -> Code
+setOffset o (a, _) = (a, o)
+
+incOffset :: Code -> Code
+incOffset = second (+ 1)
 
 getByte :: Evaluator Word8
-getByte = gets $ B.head . fst
+getByte = gets $ getCur . fst
 
 getMask :: Word8 -> Evaluator Word8
-getMask m = gets $ (.&. m) . B.head . fst
+getMask m = (.&. m) <$> getByte
 
 getShift :: Int -> Evaluator Word8
-getShift i = gets $ (`shift` i) . B.head . fst
+getShift i = (`shift` i) <$> getByte
 
 next :: Evaluator ()
-next = modify $ first B.tail
+next = modify $ first incOffset
 
 getByteNext :: Evaluator Word8
 getByteNext = getByte <* next
