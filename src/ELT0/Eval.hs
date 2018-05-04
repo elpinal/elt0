@@ -18,6 +18,7 @@ import Data.Word
 
 --- Convention ---
 --
+-- * Least significant bit first.
 -- * Most significant byte first, namely big-endian.
 --
 --
@@ -81,8 +82,11 @@ getShiftNext :: Int -> Evaluator Word8
 getShiftNext i = getShift i <* next
 
 -- @i@ starts from 0.
+test :: Int -> Evaluator Bool
+test i = flip testBit i <$> getByte
+
 testNext :: Int -> Evaluator Bool
-testNext i = flip testBit i <$> getByteNext
+testNext i = test i <* next
 
 run :: Code -> File
 run c = snd . snd $ evalc eval c
@@ -101,8 +105,8 @@ eval1 = getMask 0b11111 >>= f
   where
     f :: Word8 -> Evaluator ()
     f 0 = mov
+    f 1 = add
     f 10 = halt
-    -- 1 = add
     -- 2 = sub
     -- 3 = and
     -- 4 = or
@@ -147,6 +151,19 @@ mov = do
   r <- getByteNext
   v <- readOperand sp
   modifyReg r v
+
+-- | 5 bits (1) | 2 bit (0) | 1 bits (ignored) | 8 bits | 8 bits | 8 bits
+-- | 5 bits (1) | 2 bit (1) | 1 bits (ignored) | 8 bits | 32 bits | 8 bits
+-- | 5 bits (1) | 2 bit (2) | 1 bits (ignored) | 8 bits | 8 bits | 32 bits
+-- | 5 bits (1) | 2 bit (3) | 1 bits (ignored) | 8 bits | 32 bits | 32 bits
+add :: Evaluator ()
+add = do
+  sp1 <- test 5
+  sp2 <- testNext 6
+  r <- getByteNext
+  v1 <- readOperand sp1
+  v2 <- readOperand sp2
+  modifyReg r $ v1 + v2 -- Overflow may occur.
 
 -- | 5 bits (10 in dec) | 3 bits (ignored)
 halt :: Evaluator ()
