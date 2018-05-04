@@ -16,6 +16,11 @@ import Data.Array.Unboxed
 import qualified Data.Map.Lazy as Map
 import Data.Word
 
+--- Convention ---
+--
+-- * Most significant byte first, namely big-endian.
+--
+--
 --- The Machine Code Format ---
 --
 -- 1 instruction amount to several bytes.
@@ -113,7 +118,7 @@ modifyReg r v = lift $ modify $ second $ Map.insert r v
 getVal :: Word8 -> Evaluator Word32
 getVal r = lift $ gets $ (Map.! r) . snd
 
--- big endian
+-- In big-endian order.
 buildWord32 :: [Word8] -> Word32
 buildWord32 = foldl (\acc x -> shift acc 8 .|. toWord32 x) 0
   where
