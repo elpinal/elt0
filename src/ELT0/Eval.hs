@@ -125,16 +125,27 @@ buildWord32 = foldl (\acc x -> shift acc 8 .|. toWord32 x) 0
     toWord32 :: Word8 -> Word32
     toWord32 = fromInteger . toInteger
 
+readReg :: Evaluator Word32
+readReg = getByteNext >>= getVal
+
+readWord :: Evaluator Word32
+readWord = buildWord32 <$> replicateM 4 getByteNext
+
+-- |
+-- Given 'False', 'readOperand' reads a byte and fetching a word from a corresponding register.
+-- Given 'True', 'readOperand' reads a word.
+-- In Both cases, the offset is automatically incremented.
+readOperand :: Bool -> Evaluator Word32
+readOperand False = readReg
+readOperand True  = readWord
+
 -- | 5 bits (0) | 1 bit (0) | 2 bits (ignored) | 8 bits | 8 bits
 -- | 5 bits (0) | 1 bit (1) | 2 bits (ignored) | 8 bits | 32 bits
 mov :: Evaluator ()
 mov = do
   sp <- testNext 5 -- an operand-format specifier
   r <- getByteNext
-  v <-
-    case sp of
-      False -> getByteNext >>= getVal
-      True  -> buildWord32 <$> replicateM 4 getByteNext
+  v <- readOperand sp
   modifyReg r v
 
 -- | 5 bits (10 in dec) | 3 bits (ignored)
