@@ -120,7 +120,9 @@ modifyReg :: Word8 -> Word32 -> Evaluator ()
 modifyReg r v = lift $ modify $ second $ Map.insert r v
 
 getVal :: Word8 -> Evaluator Word32
-getVal r = lift $ gets $ (Map.! r) . snd
+getVal r = lift $ gets $ f r . snd
+  where
+    f = Map.findWithDefault $ error $ "getVal: no such register declared: " ++ show r
 
 -- In big-endian order.
 buildWord32 :: [Word8] -> Word32
