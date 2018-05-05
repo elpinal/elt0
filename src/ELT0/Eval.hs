@@ -107,12 +107,12 @@ eval1 = getMask 0b11111 >>= f
     f 0 = mov
     f 1 = add
     f 2 = sub
+    f 3 = band
+    f 4 = bor
+    f 5 = bnot
+    f 6 = shl
+    f 7 = shr
     f 10 = halt
-    -- 3 = and
-    -- 4 = or
-    -- 5 = not
-    -- 6 = shl
-    -- 7 = shr
     -- 8 = ifJmp
     -- 9 = jmp
 
@@ -177,6 +177,54 @@ add = rvv (+) -- Overflow may occur.
 -- Format: ROOs(2)
 sub :: Evaluator ()
 sub = rvv (-) -- Overflow may occur.
+
+-- Format: ROOs(3)
+-- Bitwise "and" instruction.
+band :: Evaluator ()
+band = rvv (.&.)
+
+-- Format: ROOs(4)
+-- Bitwise "or" instruction.
+bor :: Evaluator ()
+bor = rvv (.|.)
+
+-- Bitwise "not" instruction.
+-- Format:
+-- | 5 bits (5) | 1 bit (0) | 2 bits (ignored) | 8 bits | 8 bits
+-- | 5 bits (5) | 1 bit (1) | 2 bits (ignored) | 8 bits | 32 bits
+bnot :: Evaluator ()
+bnot = do
+  sp <- testNext 5
+  r <- getByteNext
+  v <- readOperand sp
+  modifyReg r $ complement v
+
+toInt :: Word32 -> Int
+toInt = fromInteger . toInteger
+
+-- Format: ROOs(6)
+-- Description: Shift left.
+--
+-- Semantics:
+-- The first argument is a destination register.
+-- The second argument is shifted left by the number of bits specified by the
+-- third argument.
+shl :: Evaluator ()
+shl = rvv f
+  where
+    f x y = shiftL x $ toInt y
+
+-- Format: ROOs(7)
+-- Description: Shift right.
+--
+-- Semantics:
+-- The first argument is a destination register.
+-- The second argument is shifted right by the number of bits specified by the
+-- third argument.
+shr :: Evaluator ()
+shr = rvv f
+  where
+    f x y = shiftR x $ toInt y
 
 -- Format:
 -- | 5 bits (10 in dec) | 3 bits (ignored)

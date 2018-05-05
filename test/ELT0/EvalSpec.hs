@@ -21,3 +21,20 @@ spec = do
 
       run (code [0b01100010, 13, 0, 0, 0, 3, 0, 0, 0, 1, 10]) `shouldBe` Map.singleton 13 2
       run (code [0b01100010, 13, 1, 1, 1, 1, 1, 1, 1, 2, 10]) `shouldBe` Map.singleton 13 0xffffffff
+
+      run (code [0b01100011, 7, 0, 0, 0, 11, 0, 0, 0, 13, 10]) `shouldBe` Map.singleton 7 9
+      run (code [0b01100011, 7, 1, 1, 1, 1, 0, 0, 0, 1, 10])   `shouldBe` Map.singleton 7 1
+
+      run (code [0b01100100, 7, 0, 0, 0, 11, 0, 0, 0, 13, 10]) `shouldBe` Map.singleton 7 15
+      run (code [0b01100100, 7, 1, 1, 1, 1, 0, 0, 0, 1, 10])   `shouldBe` Map.singleton 7 16843009
+
+      run (code [0b01100101, 7, 0xff, 0xff, 0xff, 11, 10]) `shouldBe` Map.singleton 7 244
+      run (code [0b01100101, 7, 0xff, 0xff, 0, 3, 10])     `shouldBe` Map.singleton 7 65532
+
+      run (code [0b01100110, 7, 0, 0, 0, 11, 0, 0, 0, 1, 10])            `shouldBe` Map.singleton 7 22
+      run (code [0b01100110, 7, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 1, 10]) `shouldBe` Map.singleton 7 4294967294
+
+      run (code [0b01100111, 7, 0, 0, 0, 11, 0, 0, 0, 1, 10]) `shouldBe` Map.singleton 7 5
+      run (code [0b01100111, 7, 0, 0, 1, 1, 0, 0, 0, 1, 10])  `shouldBe` Map.singleton 7 128
+      run (code [0b01100111, 7, 0, 0, 2, 1, 0, 0, 0, 1, 10])  `shouldBe` Map.singleton 7 256
+      run (code [0b01100111, 7, 0, 0, 8, 1, 0, 0, 0, 1, 10])  `shouldBe` Map.singleton 7 1024
