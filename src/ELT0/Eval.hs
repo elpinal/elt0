@@ -106,8 +106,8 @@ eval1 = getMask 0b11111 >>= f
     f :: Word8 -> Evaluator ()
     f 0 = mov
     f 1 = add
+    f 2 = sub
     f 10 = halt
-    -- 2 = sub
     -- 3 = and
     -- 4 = or
     -- 5 = not
@@ -166,6 +166,19 @@ add = do
   v1 <- readOperand sp1
   v2 <- readOperand sp2
   modifyReg r $ v1 + v2 -- Overflow may occur.
+
+-- | 5 bits (2) | 2 bit (0) | 1 bits (ignored) | 8 bits | 8 bits | 8 bits
+-- | 5 bits (2) | 2 bit (1) | 1 bits (ignored) | 8 bits | 32 bits | 8 bits
+-- | 5 bits (2) | 2 bit (2) | 1 bits (ignored) | 8 bits | 8 bits | 32 bits
+-- | 5 bits (2) | 2 bit (3) | 1 bits (ignored) | 8 bits | 32 bits | 32 bits
+sub :: Evaluator ()
+sub = do
+  sp1 <- test 5
+  sp2 <- testNext 6
+  r <- getByteNext
+  v1 <- readOperand sp1
+  v2 <- readOperand sp2
+  modifyReg r $ v1 - v2 -- Overflow may occur.
 
 -- | 5 bits (10 in dec) | 3 bits (ignored)
 halt :: Evaluator ()
