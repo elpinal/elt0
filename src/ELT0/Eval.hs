@@ -145,6 +145,7 @@ readOperand :: Bool -> Evaluator Word32
 readOperand False = readReg
 readOperand True  = readWord
 
+-- Format:
 -- | 5 bits (0) | 1 bit (0) | 2 bits (ignored) | 8 bits | 8 bits
 -- | 5 bits (0) | 1 bit (1) | 2 bits (ignored) | 8 bits | 32 bits
 mov :: Evaluator ()
@@ -154,32 +155,30 @@ mov = do
   v <- readOperand sp
   modifyReg r v
 
--- | 5 bits (1) | 2 bit (0) | 1 bits (ignored) | 8 bits | 8 bits | 8 bits
--- | 5 bits (1) | 2 bit (1) | 1 bits (ignored) | 8 bits | 32 bits | 8 bits
--- | 5 bits (1) | 2 bit (2) | 1 bits (ignored) | 8 bits | 8 bits | 32 bits
--- | 5 bits (1) | 2 bit (3) | 1 bits (ignored) | 8 bits | 32 bits | 32 bits
+-- Register-Operand-Operand (ROO) format scheme, called ROOs:
+-- For all o.
+-- | 5 bits (o) | 2 bit (0) | 1 bits (ignored) | 8 bits | 8 bits | 8 bits
+-- | 5 bits (o) | 2 bit (1) | 1 bits (ignored) | 8 bits | 32 bits | 8 bits
+-- | 5 bits (o) | 2 bit (2) | 1 bits (ignored) | 8 bits | 8 bits | 32 bits
+-- | 5 bits (o) | 2 bit (3) | 1 bits (ignored) | 8 bits | 32 bits | 32 bits
+rvv :: (Word32 -> Word32 -> Word32) -> Evaluator ()
+rvv f = do
+  sp1 <- test 5
+  sp2 <- testNext 6
+  r <- getByteNext
+  v1 <- readOperand sp1
+  v2 <- readOperand sp2
+  modifyReg r $ v1 `f` v2
+
+-- Format: ROOs(1)
 add :: Evaluator ()
-add = do
-  sp1 <- test 5
-  sp2 <- testNext 6
-  r <- getByteNext
-  v1 <- readOperand sp1
-  v2 <- readOperand sp2
-  modifyReg r $ v1 + v2 -- Overflow may occur.
+add = rvv (+) -- Overflow may occur.
 
--- | 5 bits (2) | 2 bit (0) | 1 bits (ignored) | 8 bits | 8 bits | 8 bits
--- | 5 bits (2) | 2 bit (1) | 1 bits (ignored) | 8 bits | 32 bits | 8 bits
--- | 5 bits (2) | 2 bit (2) | 1 bits (ignored) | 8 bits | 8 bits | 32 bits
--- | 5 bits (2) | 2 bit (3) | 1 bits (ignored) | 8 bits | 32 bits | 32 bits
+-- Format: ROOs(2)
 sub :: Evaluator ()
-sub = do
-  sp1 <- test 5
-  sp2 <- testNext 6
-  r <- getByteNext
-  v1 <- readOperand sp1
-  v2 <- readOperand sp2
-  modifyReg r $ v1 - v2 -- Overflow may occur.
+sub = rvv (-) -- Overflow may occur.
 
+-- Format:
 -- | 5 bits (10 in dec) | 3 bits (ignored)
 halt :: Evaluator ()
 halt = empty
