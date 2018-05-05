@@ -60,6 +60,9 @@ setOffset o (a, _) = (a, o)
 incOffset :: Code -> Code
 incOffset = second (+ 1)
 
+jumpTo :: Offset -> Evaluator ()
+jumpTo o = lift $ modify $ first $ setOffset o
+
 getByte :: Evaluator Word8
 getByte = lift $ gets $ getCur . fst
 
@@ -112,9 +115,9 @@ eval1 = getMask 0b11111 >>= f
     f 5 = bnot
     f 6 = shl
     f 7 = shr
-    f 10 = halt
     -- 8 = ifJmp
-    -- 9 = jmp
+    f 9 = jmp
+    f 10 = halt
 
 modifyReg :: Word8 -> Word32 -> Evaluator ()
 modifyReg r v = lift $ modify $ second $ Map.insert r v
@@ -225,6 +228,16 @@ shr :: Evaluator ()
 shr = rvv f
   where
     f x y = shiftR x $ toInt y
+
+-- "Jump" instruction.
+-- Format:
+-- | 5 bits (9) | 1 bit (0) | 2 bits (ignored) | 8 bits
+-- | 5 bits (9) | 1 bit (1) | 2 bits (ignored) | 32 bits
+jmp :: Evaluator ()
+jmp = do
+  sp <- testNext 5
+  v <- readOperand sp
+  jumpTo v
 
 -- Format:
 -- | 5 bits (10 in dec) | 3 bits (ignored)

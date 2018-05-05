@@ -38,3 +38,9 @@ spec = do
       run (code [0b01100111, 7, 0, 0, 1, 1, 0, 0, 0, 1, 10])  `shouldBe` Map.singleton 7 128
       run (code [0b01100111, 7, 0, 0, 2, 1, 0, 0, 0, 1, 10])  `shouldBe` Map.singleton 7 256
       run (code [0b01100111, 7, 0, 0, 8, 1, 0, 0, 0, 1, 10])  `shouldBe` Map.singleton 7 1024
+
+      run (code [0b00100000, 66, 0, 0, 0, 9, 9, 66, 10])                               `shouldBe` Map.singleton 66 9
+      run (code [0b00100000, 66, 0, 0, 0, 12, 9, 66, 0, 33, 66, 10])                   `shouldBe` Map.singleton 66 12
+      run (code [0b00100000, 66, 0, 0, 0, 9, 9, 66, 0, 33, 66, 10])                    `shouldBe` Map.fromList [(66, 9), (33, 9)]
+      run (code [0b00101001, 0, 0, 0, 6, 10])                                          `shouldBe` Map.empty
+      run (code [0b00101001, 0, 0, 0, 8, 0xff, 0xff, 0b00100000, 8, 0, 0, 0, 230, 10]) `shouldBe` Map.singleton 8 230
