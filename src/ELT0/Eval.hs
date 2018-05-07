@@ -44,6 +44,7 @@ import Data.Word
 --   * 10 -> halt
 -- * The next {n:int | 0 <= n && n <= 2 } bits specify operand-format.
 
+-- | 'File' represents a register file.
 type File = Map.Map Word8 Word32
 
 type Offset = Word32
