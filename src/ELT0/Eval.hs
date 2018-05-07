@@ -83,7 +83,7 @@ testNext :: Int -> Evaluator Bool
 testNext i = test i <* next
 
 run :: Code -> File
-run c = snd . snd $ evalc eval c
+run c = snd . snd $ evalc program c
 
 evalc :: Evaluator a -> Code -> (Maybe a, (Code, File))
 evalc e c = runEval e (c, Map.empty)
@@ -91,11 +91,11 @@ evalc e c = runEval e (c, Map.empty)
 runEval :: Evaluator a -> (Code, File) -> (Maybe a, (Code, File))
 runEval e s = flip runState s $ runMaybeT e
 
-eval :: Evaluator ()
-eval = forever eval1
+program :: Evaluator ()
+program = forever instruction
 
-eval1 :: Evaluator ()
-eval1 = getMask 0b11111 >>= f
+instruction :: Evaluator ()
+instruction = getMask 0b11111 >>= f
   where
     f :: Word8 -> Evaluator ()
     f 0 = mov
