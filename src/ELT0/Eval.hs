@@ -164,8 +164,8 @@ mov = do
 -- | 5 bits (o) | 2 bit (1) | 1 bits (ignored) | 8 bits | 32 bits | 8 bits
 -- | 5 bits (o) | 2 bit (2) | 1 bits (ignored) | 8 bits | 8 bits | 32 bits
 -- | 5 bits (o) | 2 bit (3) | 1 bits (ignored) | 8 bits | 32 bits | 32 bits
-rvv :: (Word32 -> Word32 -> Word32) -> Evaluator ()
-rvv f = do
+roo :: (Word32 -> Word32 -> Word32) -> Evaluator ()
+roo f = do
   sp1 <- test 5
   sp2 <- testNext 6
   r <- getByteNext
@@ -175,21 +175,21 @@ rvv f = do
 
 -- Format: ROOs(1)
 add :: Evaluator ()
-add = rvv (+) -- Overflow may occur.
+add = roo (+) -- Overflow may occur.
 
 -- Format: ROOs(2)
 sub :: Evaluator ()
-sub = rvv (-) -- Overflow may occur.
+sub = roo (-) -- Overflow may occur.
 
 -- Format: ROOs(3)
 -- Bitwise "and" instruction.
 band :: Evaluator ()
-band = rvv (.&.)
+band = roo (.&.)
 
 -- Format: ROOs(4)
 -- Bitwise "or" instruction.
 bor :: Evaluator ()
-bor = rvv (.|.)
+bor = roo (.|.)
 
 -- Bitwise "not" instruction.
 -- Format:
@@ -213,7 +213,7 @@ toInt = fromInteger . toInteger
 -- The second argument is logically shifted left by the number of bits
 -- specified by the third argument.
 shl :: Evaluator ()
-shl = rvv f
+shl = roo f
   where
     f x y = shiftL x $ toInt y
 
@@ -225,7 +225,7 @@ shl = rvv f
 -- The second argument is logically shifted right by the number of bits
 -- specified by the third argument.
 shr :: Evaluator ()
-shr = rvv f
+shr = roo f
   where
     f x y = shiftR x $ toInt y
 
