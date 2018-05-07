@@ -2,6 +2,7 @@
 
 module ELT0.Eval
   ( run
+  , runFile
   , code
   ) where
 
@@ -82,11 +83,15 @@ test i = flip testBit i <$> getByte
 testNext :: Int -> Evaluator Bool
 testNext i = test i <* next
 
+-- | Evaluates a program, then returns a calculated register file.
 run :: Code -> File
-run c = snd . snd $ evalc program c
+run c = runFile c Map.empty
 
-evalc :: Evaluator a -> Code -> (Maybe a, (Code, File))
-evalc e c = runEvaluator e (c, Map.empty)
+-- |
+-- Evaluates a program with an initial register file, then returns
+-- a calculated register file.
+runFile :: Code -> File -> File
+runFile c = snd . snd . curry (runEvaluator program) c
 
 runEvaluator :: Evaluator a -> (Code, File) -> (Maybe a, (Code, File))
 runEvaluator e s = flip runState s $ runMaybeT e
