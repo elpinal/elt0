@@ -86,10 +86,10 @@ run :: Code -> File
 run c = snd . snd $ evalc program c
 
 evalc :: Evaluator a -> Code -> (Maybe a, (Code, File))
-evalc e c = runEval e (c, Map.empty)
+evalc e c = runEvaluator e (c, Map.empty)
 
-runEval :: Evaluator a -> (Code, File) -> (Maybe a, (Code, File))
-runEval e s = flip runState s $ runMaybeT e
+runEvaluator :: Evaluator a -> (Code, File) -> (Maybe a, (Code, File))
+runEvaluator e s = flip runState s $ runMaybeT e
 
 program :: Evaluator ()
 program = forever instruction
