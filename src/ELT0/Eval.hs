@@ -254,6 +254,6 @@ jmp = do
   jumpTo v
 
 -- Format:
--- | 5 bits (10 in dec) | 3 bits (ignored)
+-- | 5 bits (10 in decimal) | 3 bits (ignored)
 halt :: Evaluator ()
 halt = empty
