@@ -115,7 +115,7 @@ eval1 = getMask 0b11111 >>= f
     f 5 = bnot
     f 6 = shl
     f 7 = shr
-    -- 8 = ifJmp
+    f 8 = ifJmp
     f 9 = jmp
     f 10 = halt
 
@@ -228,6 +228,20 @@ shr :: Evaluator ()
 shr = rvv f
   where
     f x y = shiftR x $ toInt y
+
+-- "Conditional Jump" instruction.
+-- Jump is executed only when the value of a register given as the first
+-- argument equals zero.
+-- Format:
+-- | 5 bits (8) | 1 bit (0) | 2 bits (ignored) | 8 bits | 8 bits
+-- | 5 bits (8) | 1 bit (1) | 2 bits (ignored) | 8 bits | 32 bits
+ifJmp :: Evaluator ()
+ifJmp = do
+  sp <- testNext 5
+  rr <- readReg -- The right value of a register.
+  v <- readOperand sp
+  when (rr == 0) $
+    jumpTo v
 
 -- "Jump" instruction.
 -- Format:
