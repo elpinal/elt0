@@ -206,24 +206,24 @@ toInt :: Word32 -> Int
 toInt = fromInteger . toInteger
 
 -- Format: ROOs(6)
--- Description: Shift left.
+-- Description: Logical left shift.
 --
 -- Semantics:
 -- The first argument is a destination register.
--- The second argument is shifted left by the number of bits specified by the
--- third argument.
+-- The second argument is logically shifted left by the number of bits
+-- specified by the third argument.
 shl :: Evaluator ()
 shl = rvv f
   where
     f x y = shiftL x $ toInt y
 
 -- Format: ROOs(7)
--- Description: Shift right.
+-- Description: Logical right shift.
 --
 -- Semantics:
 -- The first argument is a destination register.
--- The second argument is shifted right by the number of bits specified by the
--- third argument.
+-- The second argument is logically shifted right by the number of bits
+-- specified by the third argument.
 shr :: Evaluator ()
 shr = rvv f
   where
