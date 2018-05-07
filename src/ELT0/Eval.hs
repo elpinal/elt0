@@ -134,19 +134,19 @@ buildWord32 = foldl (\acc x -> shift acc 8 .|. toWord32 x) 0
     toWord32 :: Word8 -> Word32
     toWord32 = fromInteger . toInteger
 
-readReg :: Evaluator Word32
-readReg = getByteNext >>= getVal
+fetchReg :: Evaluator Word32
+fetchReg = getByteNext >>= getVal
 
-readWord :: Evaluator Word32
-readWord = buildWord32 <$> replicateM 4 getByteNext
+fetchWord :: Evaluator Word32
+fetchWord = buildWord32 <$> replicateM 4 getByteNext
 
 -- |
--- Given 'False', 'readOperand' reads a byte and fetches a word from a corresponding register.
--- Given 'True', 'readOperand' reads a word.
+-- Given 'False', 'fetchOperand' reads a byte and fetches a word from a corresponding register.
+-- Given 'True', 'fetchOperand' reads a word.
 -- In Both cases, the offset is automatically incremented.
-readOperand :: Bool -> Evaluator Word32
-readOperand False = readReg
-readOperand True  = readWord
+fetchOperand :: Bool -> Evaluator Word32
+fetchOperand False = fetchReg
+fetchOperand True  = fetchWord
 
 -- Format:
 -- | 5 bits (0) | 1 bit (0) | 2 bits (ignored) | 8 bits | 8 bits
@@ -155,7 +155,7 @@ mov :: Evaluator ()
 mov = do
   sp <- testNext 5 -- an operand-format specifier
   r <- getByteNext
-  v <- readOperand sp
+  v <- fetchOperand sp
   modifyReg r v
 
 -- Register-Operand-Operand (ROO) format scheme, called ROOs:
@@ -169,8 +169,8 @@ roo f = do
   sp1 <- test 5
   sp2 <- testNext 6
   r <- getByteNext
-  v1 <- readOperand sp1
-  v2 <- readOperand sp2
+  v1 <- fetchOperand sp1
+  v2 <- fetchOperand sp2
   modifyReg r $ v1 `f` v2
 
 -- Format: ROOs(1)
@@ -199,7 +199,7 @@ bnot :: Evaluator ()
 bnot = do
   sp <- testNext 5
   r <- getByteNext
-  v <- readOperand sp
+  v <- fetchOperand sp
   modifyReg r $ complement v
 
 toInt :: Word32 -> Int
@@ -238,8 +238,8 @@ shr = roo f
 ifJmp :: Evaluator ()
 ifJmp = do
   sp <- testNext 5
-  rr <- readReg -- The right value of a register.
-  v <- readOperand sp
+  rr <- fetchReg -- The right value of a register.
+  v <- fetchOperand sp
   when (rr == 0) $
     jumpTo v
 
@@ -250,7 +250,7 @@ ifJmp = do
 jmp :: Evaluator ()
 jmp = do
   sp <- testNext 5
-  v <- readOperand sp
+  v <- fetchOperand sp
   jumpTo v
 
 -- Format:
