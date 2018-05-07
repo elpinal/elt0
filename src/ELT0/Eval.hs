@@ -4,6 +4,9 @@ module ELT0.Eval
   ( run
   , runFile
   , code
+  , Code
+  , Offset
+  , File
   ) where
 
 import Control.Applicative
