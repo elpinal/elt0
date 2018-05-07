@@ -42,7 +42,7 @@ import Data.Word
 --   * 8 -> if-jmp
 --   * 9 -> jmp
 --   * 10 -> halt
--- * The next {n:int | 0 <= n && n <= 2 } bits specify operand-format.
+-- * The next { n:int | 0 <= n && n <= 2 } bits specify operand-format.
 
 -- | 'File' represents a register file.
 type File = Map.Map Word8 Word32
@@ -141,7 +141,7 @@ readWord :: Evaluator Word32
 readWord = buildWord32 <$> replicateM 4 getByteNext
 
 -- |
--- Given 'False', 'readOperand' reads a byte and fetching a word from a corresponding register.
+-- Given 'False', 'readOperand' reads a byte and fetches a word from a corresponding register.
 -- Given 'True', 'readOperand' reads a word.
 -- In Both cases, the offset is automatically incremented.
 readOperand :: Bool -> Evaluator Word32
