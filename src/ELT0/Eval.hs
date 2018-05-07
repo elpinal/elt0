@@ -69,20 +69,11 @@ getByte = lift $ gets $ getCur . fst
 getMask :: Word8 -> Evaluator Word8
 getMask m = (.&. m) <$> getByte
 
-getShift :: Int -> Evaluator Word8
-getShift i = (`shift` i) <$> getByte
-
 next :: Evaluator ()
 next = lift $ modify $ first incOffset
 
 getByteNext :: Evaluator Word8
 getByteNext = getByte <* next
-
-getMaskNext :: Word8 -> Evaluator Word8
-getMaskNext m = getMask m <* next
-
-getShiftNext :: Int -> Evaluator Word8
-getShiftNext i = getShift i <* next
 
 -- @i@ starts from 0.
 test :: Int -> Evaluator Bool
