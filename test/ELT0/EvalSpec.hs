@@ -10,7 +10,7 @@ import ELT0.Eval
 
 spec :: Spec
 spec = do
-  describe "run" $
+  describe "run & runFile" $
     it "evaluates a code, then returns the result register file" $ do
       -- "halt"
       run (code [10]) `shouldBe` Map.empty
@@ -54,6 +54,10 @@ spec = do
       run (code [0b00100000, 66, 0, 0, 0, 9, 8, 66, 66, 10])                              `shouldBe` Map.singleton 66 9
       run (code [0b00100000, 66, 0, 0, 0, 13, 8, 66, 66, 0, 33, 66, 10])                  `shouldBe` Map.fromList [(66, 13), (33, 13)]
       run (code [0b00100000, 66, 0, 0, 0, 0, 0b00101000, 66, 0, 0, 0, 16, 0, 33, 66, 10]) `shouldBe` Map.singleton 66 0
+      let m = (Map.fromList [(121, 1), (7, 7)])
+      runFile (code [8, 121, 7, 0, 8, 121, 10]) m `shouldBe` Map.insert 8 1 m
+      let m = (Map.fromList [(121, 0), (7, 7)])
+      runFile (code [8, 121, 7, 0, 8, 121, 10]) m `shouldBe` m
 
       -- "jmp"
       run (code [0b00100000, 66, 0, 0, 0, 9, 9, 66, 10])                               `shouldBe` Map.singleton 66 9
