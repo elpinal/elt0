@@ -68,24 +68,24 @@ incOffset = second (+ 1)
 jumpTo :: Offset -> Evaluator ()
 jumpTo o = lift $ modify $ first $ setOffset o
 
-getByte :: Evaluator Word8
-getByte = lift $ gets $ getCur . fst
+readByte :: Evaluator Word8
+readByte = lift $ gets $ getCur . fst
 
-getMask :: Word8 -> Evaluator Word8
-getMask m = (.&. m) <$> getByte
+readMask :: Word8 -> Evaluator Word8
+readMask m = (.&. m) <$> readByte
 
-next :: Evaluator ()
-next = lift $ modify $ first incOffset
+inc :: Evaluator ()
+inc = lift $ modify $ first incOffset
 
-getByteNext :: Evaluator Word8
-getByteNext = getByte <* next
+fetchByte :: Evaluator Word8
+fetchByte = readByte <* inc
 
 -- @i@ starts from 0.
-test :: Int -> Evaluator Bool
-test i = flip testBit i <$> getByte
+readTest :: Int -> Evaluator Bool
+readTest i = flip testBit i <$> readByte
 
-testNext :: Int -> Evaluator Bool
-testNext i = test i <* next
+fetchTest :: Int -> Evaluator Bool
+fetchTest i = readTest i <* inc
 
 -- | Evaluates a program, then returns a calculated register file.
 run :: Code -> File
@@ -104,7 +104,7 @@ program :: Evaluator ()
 program = forever instruction
 
 instruction :: Evaluator ()
-instruction = getMask 0b11111 >>= f
+instruction = readMask 0b11111 >>= f
   where
     f :: Word8 -> Evaluator ()
     f 0 = mov
@@ -135,10 +135,10 @@ buildWord32 = foldl (\acc x -> shift acc 8 .|. toWord32 x) 0
     toWord32 = fromInteger . toInteger
 
 fetchReg :: Evaluator Word32
-fetchReg = getByteNext >>= getVal
+fetchReg = fetchByte >>= getVal
 
 fetchWord :: Evaluator Word32
-fetchWord = buildWord32 <$> replicateM 4 getByteNext
+fetchWord = buildWord32 <$> replicateM 4 fetchByte
 
 -- |
 -- Given 'False', 'fetchOperand' reads a byte and fetches a word from a corresponding register.
@@ -153,8 +153,8 @@ fetchOperand True  = fetchWord
 -- | 5 bits (0) | 1 bit (1) | 2 bits (ignored) | 8 bits | 32 bits
 mov :: Evaluator ()
 mov = do
-  sp <- testNext 5 -- an operand-format specifier
-  r <- getByteNext
+  sp <- fetchTest 5 -- an operand-format specifier
+  r <- fetchByte
   v <- fetchOperand sp
   modifyReg r v
 
@@ -166,9 +166,9 @@ mov = do
 -- | 5 bits (o) | 2 bit (3) | 1 bits (ignored) | 8 bits | 32 bits | 32 bits
 roo :: (Word32 -> Word32 -> Word32) -> Evaluator ()
 roo f = do
-  sp1 <- test 5
-  sp2 <- testNext 6
-  r <- getByteNext
+  sp1 <- readTest 5
+  sp2 <- fetchTest 6
+  r <- fetchByte
   v1 <- fetchOperand sp1
   v2 <- fetchOperand sp2
   modifyReg r $ v1 `f` v2
@@ -197,8 +197,8 @@ bor = roo (.|.)
 -- | 5 bits (5) | 1 bit (1) | 2 bits (ignored) | 8 bits | 32 bits
 bnot :: Evaluator ()
 bnot = do
-  sp <- testNext 5
-  r <- getByteNext
+  sp <- fetchTest 5
+  r <- fetchByte
   v <- fetchOperand sp
   modifyReg r $ complement v
 
@@ -237,7 +237,7 @@ shr = roo f
 -- | 5 bits (8) | 1 bit (1) | 2 bits (ignored) | 8 bits | 32 bits
 ifJmp :: Evaluator ()
 ifJmp = do
-  sp <- testNext 5
+  sp <- fetchTest 5
   rr <- fetchReg -- The right value of a register.
   v <- fetchOperand sp
   when (rr == 0) $
@@ -249,7 +249,7 @@ ifJmp = do
 -- | 5 bits (9) | 1 bit (1) | 2 bits (ignored) | 32 bits
 jmp :: Evaluator ()
 jmp = do
-  sp <- testNext 5
+  sp <- fetchTest 5
   v <- fetchOperand sp
   jumpTo v
 
