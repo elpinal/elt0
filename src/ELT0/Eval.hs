@@ -28,9 +28,11 @@ import Data.Word
 --
 --- The Machine Code Format ---
 --
--- 1 instruction amount to several bytes.
+-- Each instruction amounts to several bytes.
 --
--- * The first 5 bits are for opcodes.
+-- * The first 5 bits represent an opcode.
+--   More precicely, they determine which kind of instruction is selected.
+--   The correspondence between decimal numbers and mnemonics is defined as follows:
 --   * 0 -> mov
 --   * 1 -> add
 --   * 2 -> sub
@@ -42,7 +44,9 @@ import Data.Word
 --   * 8 -> if-jmp
 --   * 9 -> jmp
 --   * 10 -> halt
--- * The next { n:int | 0 <= n && n <= 2 } bits specify operand-format.
+-- * The next { n:int | 0 <= n && n <= 2 } bits specify a format of operands.
+--   { n } depends on the opcode of an instruction in question.
+-- * The rest of an instruction represents its operands.
 
 -- | 'File' represents a register file.
 type File = Map.Map Word8 Word32
