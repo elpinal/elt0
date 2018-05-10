@@ -55,7 +55,21 @@ type Offset = Word32
 
 type Code = (UArray Word32 Word8, Offset)
 
-type Evaluator = MaybeT (State (Code, File))
+data Machine = Machine Code File
+
+getCode :: Machine -> Code
+getCode (Machine c _) = c
+
+getFile :: Machine -> File
+getFile (Machine _ f) = f
+
+mapCode :: (Code -> Code) -> Machine -> Machine
+mapCode f (Machine c rf) = Machine (f c) rf
+
+mapFile :: (File -> File) -> Machine -> Machine
+mapFile f (Machine c rf) = Machine c $ f rf
+
+type Evaluator = MaybeT (State Machine)
 
 code :: [Word8] -> Code
 code l = (listArray (1, fromInteger . toInteger $ length l) l, 1)
@@ -70,16 +84,16 @@ incOffset :: Code -> Code
 incOffset = second (+ 1)
 
 jumpTo :: Offset -> Evaluator ()
-jumpTo o = lift $ modify $ first $ setOffset o
+jumpTo o = lift $ modify $ mapCode $ setOffset o
 
 readByte :: Evaluator Word8
-readByte = lift $ gets $ getCur . fst
+readByte = lift $ gets $ getCur . getCode
 
 readMask :: Word8 -> Evaluator Word8
 readMask m = (.&. m) <$> readByte
 
 inc :: Evaluator ()
-inc = lift $ modify $ first incOffset
+inc = lift $ modify $ mapCode incOffset
 
 fetchByte :: Evaluator Word8
 fetchByte = readByte <* inc
@@ -99,9 +113,9 @@ run c = runFile c Map.empty
 -- Evaluates a program with an initial register file, then returns
 -- a calculated register file.
 runFile :: Code -> File -> File
-runFile c = snd . snd . curry (runEvaluator program) c
+runFile c = getFile . snd . runEvaluator program . Machine c
 
-runEvaluator :: Evaluator a -> (Code, File) -> (Maybe a, (Code, File))
+runEvaluator :: Evaluator a -> Machine -> (Maybe a, Machine)
 runEvaluator e s = flip runState s $ runMaybeT e
 
 program :: Evaluator ()
@@ -124,10 +138,10 @@ instruction = readMask 0b11111 >>= f
     f 10 = halt
 
 modifyReg :: Word8 -> Word32 -> Evaluator ()
-modifyReg r v = lift $ modify $ second $ Map.insert r v
+modifyReg r v = lift $ modify $ mapFile $ Map.insert r v
 
 getVal :: Word8 -> Evaluator Word32
-getVal r = lift $ gets $ f r . snd
+getVal r = lift $ gets $ f r . getFile
   where
     f = Map.findWithDefault $ error $ "getVal: no such register declared: " ++ show r
 
