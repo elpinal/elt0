@@ -3,6 +3,7 @@
 module ELT0.Eval
   ( run
   , runFile
+  , runStack
   , code
   , Code
   , Offset
@@ -44,6 +45,7 @@ import Data.Word
 --   * 8 -> if-jmp
 --   * 9 -> jmp
 --   * 10 -> halt
+--   * 11 -> salloc
 -- * The next { n:int | 0 <= n && n <= 2 } bits specify a format of operands.
 --   { n } depends on the opcode of an instruction in question.
 -- * The rest of an instruction represents its operands.
@@ -55,19 +57,27 @@ type Offset = Word32
 
 type Code = (UArray Word32 Word8, Offset)
 
-data Machine = Machine Code File
+type Stack = [Word32]
+
+data Machine = Machine Code File Stack
 
 getCode :: Machine -> Code
-getCode (Machine c _) = c
+getCode (Machine c _ _) = c
 
 getFile :: Machine -> File
-getFile (Machine _ f) = f
+getFile (Machine _ f _) = f
+
+getStack :: Machine -> Stack
+getStack (Machine _ _ s) = s
 
 mapCode :: (Code -> Code) -> Machine -> Machine
-mapCode f (Machine c rf) = Machine (f c) rf
+mapCode f (Machine c rf s) = Machine (f c) rf s
 
 mapFile :: (File -> File) -> Machine -> Machine
-mapFile f (Machine c rf) = Machine c $ f rf
+mapFile f (Machine c rf s) = Machine c (f rf) s
+
+mapStack :: (Stack -> Stack) -> Machine -> Machine
+mapStack f (Machine c rf s) = Machine c rf $ f s
 
 type Evaluator = MaybeT (State Machine)
 
@@ -113,7 +123,10 @@ run c = runFile c Map.empty
 -- Evaluates a program with an initial register file, then returns
 -- a calculated register file.
 runFile :: Code -> File -> File
-runFile c = getFile . snd . runEvaluator program . Machine c
+runFile c f = getFile . snd . runEvaluator program $ Machine c f mempty
+
+runStack :: Code -> Stack -> Stack
+runStack c s = getStack . snd . runEvaluator program $ Machine c Map.empty s
 
 runEvaluator :: Evaluator a -> Machine -> (Maybe a, Machine)
 runEvaluator e s = flip runState s $ runMaybeT e
@@ -136,6 +149,7 @@ instruction = readMask 0b11111 >>= f
     f 8 = ifJmp
     f 9 = jmp
     f 10 = halt
+    f 11 = salloc
 
 modifyReg :: Word8 -> Word32 -> Evaluator ()
 modifyReg r v = lift $ modify $ mapFile $ Map.insert r v
@@ -275,3 +289,17 @@ jmp = do
 -- | 5 bits (10 in decimal) | 3 bits (ignored)
 halt :: Evaluator ()
 halt = empty
+
+pushWord :: Word32 -> Evaluator ()
+pushWord w = lift . modify . mapStack $ (w :)
+
+-- "Stack allocation" instruction.
+-- Allocated slots are uninitialized. In fact, they are set to zero.
+-- Format:
+-- | 5 bits (11 in decimal) | 3 bits (ignored) | 32 bits
+salloc :: Evaluator ()
+salloc = inc >> fetchWord >>= loop
+  where
+    loop cnt
+      | cnt == 0 = pure ()
+      | otherwise = pushWord 0 *> loop (cnt - 1)
