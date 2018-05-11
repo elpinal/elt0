@@ -77,3 +77,8 @@ spec = do
       runStack (code [12, 0, 0, 0, 0, 10]) [5]                           `shouldBe` [5]
       runStack (code [12, 0, 0, 0, 1, 10]) [12]                          `shouldBe` []
       runStack (code [12, 0, 0, 0, 4, 10]) [12, 1, 3, 18, 8031, 23, 922] `shouldBe` [8031, 23, 922]
+
+      -- "sld"
+      let f rf s (Machine _ rf0 s0) = rf0 == rf && s0 == s
+      runMachine (Machine (code [13, 12, 0, 0, 0, 0, 10]) Map.empty [555]) `shouldSatisfy` f (Map.singleton 12 555) [555]
+      runMachine (Machine (code [13, 12, 0, 0, 0, 1, 10]) Map.empty [7, 3]) `shouldSatisfy` f (Map.singleton 12 3) [7, 3]

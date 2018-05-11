@@ -4,10 +4,12 @@ module ELT0.Eval
   ( run
   , runFile
   , runStack
+  , runMachine
   , code
   , Code
   , Offset
   , File
+  , Machine(..)
   ) where
 
 import Control.Applicative
@@ -18,6 +20,7 @@ import Control.Monad.Trans.State.Lazy
 import Data.Bifunctor
 import Data.Bits
 import Data.Array.Unboxed
+import Data.List
 import qualified Data.Map.Lazy as Map
 import Data.Word
 
@@ -47,6 +50,7 @@ import Data.Word
 --   * 10 -> halt
 --   * 11 -> salloc
 --   * 12 -> sfree
+--   * 13 -> sld
 -- * The next { n:int | 0 <= n && n <= 2 } bits specify a format of operands.
 --   { n } depends on the opcode of an instruction in question.
 -- * The rest of an instruction represents its operands.
@@ -61,6 +65,7 @@ type Code = (UArray Word32 Word8, Offset)
 type Stack = [Word32]
 
 data Machine = Machine Code File Stack
+  deriving (Eq, Show)
 
 getCode :: Machine -> Code
 getCode (Machine c _ _) = c
@@ -79,6 +84,9 @@ mapFile f (Machine c rf s) = Machine c (f rf) s
 
 mapStack :: (Stack -> Stack) -> Machine -> Machine
 mapStack f (Machine c rf s) = Machine c rf $ f s
+
+accessStack :: Word32 -> Stack -> Word32
+accessStack w s = s `genericIndex` w
 
 type Evaluator = MaybeT (State Machine)
 
@@ -124,10 +132,13 @@ run c = runFile c Map.empty
 -- Evaluates a program with an initial register file, then returns
 -- a calculated register file.
 runFile :: Code -> File -> File
-runFile c f = getFile . snd . runEvaluator program $ Machine c f mempty
+runFile c f = getFile . runMachine $ Machine c f mempty
 
 runStack :: Code -> Stack -> Stack
-runStack c s = getStack . snd . runEvaluator program $ Machine c Map.empty s
+runStack c s = getStack . runMachine $ Machine c Map.empty s
+
+runMachine :: Machine -> Machine
+runMachine = snd . runEvaluator program
 
 runEvaluator :: Evaluator a -> Machine -> (Maybe a, Machine)
 runEvaluator e s = flip runState s $ runMaybeT e
@@ -152,6 +163,7 @@ instruction = readMask 0b11111 >>= f
     f 10 = halt
     f 11 = salloc
     f 12 = sfree
+    f 13 = sld
 
 modifyReg :: Word8 -> Word32 -> Evaluator ()
 modifyReg r v = lift $ modify $ mapFile $ Map.insert r v
@@ -320,3 +332,14 @@ sfree = inc >> fetchWord >>= loop
     loop cnt
       | cnt == 0 = pure ()
       | otherwise = dropWord *> loop (cnt - 1)
+
+getFromStack :: Word32 -> Evaluator Word32
+getFromStack w = lift . gets $ accessStack w . getStack
+
+-- "Stack load" instruction.
+-- Load a word from the nth slot of the stack into a register.
+-- The index starts from 0; the 0th slot is the top of the stack.
+-- Format:
+-- | 5 bits (13 in decimal) | 3 bits (ignored) | 8 bits | 32 bits
+sld :: Evaluator ()
+sld = join $ inc >> modifyReg <$> fetchByte <*> (fetchWord >>= getFromStack)
