@@ -51,6 +51,7 @@ import Data.Word
 --   * 11 -> salloc
 --   * 12 -> sfree
 --   * 13 -> sld
+--   * 14 -> sst
 -- * The next { n:int | 0 <= n && n <= 2 } bits specify a format of operands.
 --   { n } depends on the opcode of an instruction in question.
 -- * The rest of an instruction represents its operands.
@@ -87,6 +88,10 @@ mapStack f (Machine c rf s) = Machine c rf $ f s
 
 accessStack :: Word32 -> Stack -> Word32
 accessStack w s = s `genericIndex` w
+
+insertStack :: Word32 -> Word32 -> Stack -> Stack
+insertStack 0 w (_ : s) = w : s
+insertStack i w (h : s) = h : insertStack (i - 1) w s
 
 type Evaluator = MaybeT (State Machine)
 
@@ -164,9 +169,13 @@ instruction = readMask 0b11111 >>= f
     f 11 = salloc
     f 12 = sfree
     f 13 = sld
+    f 14 = sst
 
 modifyReg :: Word8 -> Word32 -> Evaluator ()
 modifyReg r v = lift $ modify $ mapFile $ Map.insert r v
+
+modifyStack :: Word32 -> Word32 -> Evaluator ()
+modifyStack i w = lift $ modify $ mapStack $ insertStack i w
 
 getVal :: Word8 -> Evaluator Word32
 getVal r = lift $ gets $ f r . getFile
@@ -343,3 +352,13 @@ getFromStack w = lift . gets $ accessStack w . getStack
 -- | 5 bits (13 in decimal) | 3 bits (ignored) | 8 bits | 32 bits
 sld :: Evaluator ()
 sld = join $ inc >> modifyReg <$> fetchByte <*> (fetchWord >>= getFromStack)
+
+-- "Stack store" instruction.
+-- Store a word into the nth slot of the stack.
+-- Format:
+-- | 5 bits (14 in decimal) | 1 bit (0) | 2 bits (ignored) | 8 bits | 8 bits
+-- | 5 bits (14 in decimal) | 1 bit (1) | 2 bits (ignored) | 8 bits | 32 bits
+sst :: Evaluator ()
+sst = do
+  sp <- fetchTest 5
+  join $ modifyStack <$> fetchWord <*> fetchOperand sp
