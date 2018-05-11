@@ -46,6 +46,7 @@ import Data.Word
 --   * 9 -> jmp
 --   * 10 -> halt
 --   * 11 -> salloc
+--   * 12 -> sfree
 -- * The next { n:int | 0 <= n && n <= 2 } bits specify a format of operands.
 --   { n } depends on the opcode of an instruction in question.
 -- * The rest of an instruction represents its operands.
@@ -150,6 +151,7 @@ instruction = readMask 0b11111 >>= f
     f 9 = jmp
     f 10 = halt
     f 11 = salloc
+    f 12 = sfree
 
 modifyReg :: Word8 -> Word32 -> Evaluator ()
 modifyReg r v = lift $ modify $ mapFile $ Map.insert r v
@@ -303,3 +305,18 @@ salloc = inc >> fetchWord >>= loop
     loop cnt
       | cnt == 0 = pure ()
       | otherwise = pushWord 0 *> loop (cnt - 1)
+
+dropWord :: Evaluator ()
+dropWord = lift . modify $ mapStack f
+  where
+    f (_ : xs) = xs
+
+-- "Stack free" instruction.
+-- Format:
+-- | 5 bits (12 in decimal) | 3 bits (ignored) | 32 bits
+sfree :: Evaluator ()
+sfree = inc >> fetchWord >>= loop
+  where
+    loop cnt
+      | cnt == 0 = pure ()
+      | otherwise = dropWord *> loop (cnt - 1)
