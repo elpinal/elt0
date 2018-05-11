@@ -17,9 +17,9 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.State.Lazy
+import Data.Array.Unboxed
 import Data.Bifunctor
 import Data.Bits
-import Data.Array.Unboxed
 import Data.List
 import qualified Data.Map.Lazy as Map
 import Data.Word
