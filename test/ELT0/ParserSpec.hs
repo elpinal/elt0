@@ -25,6 +25,9 @@ spec = do
       mainParser "main:\n mov R0 1\n jmp next"             `shouldBe` prog [Block "main" [Reg 0 `Mov` wordO 1] $ jmpTo "next"]
       mainParser "x:\nshr R255 1000 288\nnot R0 0\n jmp a" `shouldBe` prog [Block "x" [Shr (Reg 255) (wordN 1000) (wordN 288), Reg 0 `Not` wordN 0] $ jmpTo "a"]
 
+      mainParser "l:\n salloc 0\n salloc 2\n sfree 129\n sld R80 1055\n halt" `shouldBe` prog [Block "l" [Salloc 0, Salloc 2, Sfree 129, Sld (Reg 80) 1055] Nothing]
+      mainParser "p:\n sst 10000 label\n sst 0 3\n sst 1 R7\n halt"           `shouldBe` prog [Block "p" [Sst 10000 (labelO "label"), Sst 0 (wordO 3), Sst 1 (registerO 7)] Nothing]
+
     context "given illegal syntax" $
       it "fails" $ do
         mainParser "L1:\n jmp main"  `shouldSatisfy` isLeft -- labels must not start in upper case.

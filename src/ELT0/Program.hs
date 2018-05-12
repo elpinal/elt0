@@ -11,6 +11,7 @@ module ELT0.Program
   , Display(..)
   , wordO
   , labelO
+  , registerO
   , wordN
   , registerN
   , labelP
@@ -126,6 +127,9 @@ wordO = Value . Word . W
 
 labelO :: String -> Operand
 labelO = Value . Label
+
+registerO :: Word8 -> Operand
+registerO = Register . Reg
 
 wordN :: Word32 -> Numeric
 wordN = NWord . W
