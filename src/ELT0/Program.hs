@@ -56,6 +56,9 @@ data Inst
   | Shr Reg Numeric Numeric
   | If  Reg Place
   | Salloc Word32
+  | Sfree  Word32
+  | Sld    Reg Word32
+  | Sst    Word32 Operand -- Allow labels to be used with the "sst" instruction.
   deriving (Eq, Show)
 
 newtype Program = Program [Block]
@@ -103,6 +106,9 @@ display' (Shl r o1 o2) = ["shl"   , display r, display o1, display o2]
 display' (Shr r o1 o2) = ["shr"   , display r, display o1, display o2]
 display' (If r p)      = ["if"    , display r, "jmp", display p]
 display' (Salloc w)    = ["salloc", show w]
+display' (Sfree w)     = ["sfree" , show w]
+display' (Sld r w)     = ["sld"   , display r, show w]
+display' (Sst w o)     = ["sst"   , show w, display o]
 
 instance Display Block where
   display (Block l is m) = l ++ ":\n" ++

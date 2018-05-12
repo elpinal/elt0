@@ -39,6 +39,9 @@ data Mnemonic
   | TShr
   | TIf
   | TSalloc
+  | TSfree
+  | TSld
+  | TSst
   deriving (Eq, Show)
 
 type TokenP = (Token, Position)
@@ -255,6 +258,9 @@ lexLetters p a = return (f a, p)
     f "shr"    = Mnem TShr
     f "if"     = Mnem TIf
     f "salloc" = Mnem TSalloc
+    f "sfree"  = Mnem TSfree
+    f "sld"    = Mnem TSld
+    f "sst"    = Mnem TSst
     f "jmp"    = Jmp -- Notice that this is not Mnem.
     f "halt"   = Halt
     f a        = Ident a
@@ -371,6 +377,9 @@ inst = join $ predOption p
     f TShr    = inst3opN Shr
     f TIf     = ifJmp
     f TSalloc = salloc
+    f TSfree  = sfree
+    f TSld    = sld
+    f TSst    = sst
 
 inst2opN :: (Reg -> Numeric -> a) -> Parser a
 inst2opN f = f <$> reg <*> numeric
@@ -384,11 +393,23 @@ inst3opN f = f <$> reg <*> numeric <*> numeric
 ifJmp :: Parser Inst
 ifJmp = If <$> (reg <* exactSkip Jmp) <*> place
 
-salloc :: Parser Inst
-salloc = Salloc <$> predExact w WordLit
+word32 :: Parser Word32
+word32 = predExact w WordLit
   where
     w (Digits w) = Just w
     w _ = Nothing
+
+salloc :: Parser Inst
+salloc = Salloc <$> word32
+
+sfree :: Parser Inst
+sfree = Sfree <$> word32
+
+sld :: Parser Inst
+sld = Sld <$> reg <*> word32
+
+sst :: Parser Inst
+sst = Sst <$> word32 <*> operand
 
 reg :: Parser Reg
 reg = predEOF f
