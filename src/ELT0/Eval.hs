@@ -356,8 +356,8 @@ sld = join $ inc >> modifyReg <$> fetchByte <*> (fetchWord >>= getFromStack)
 -- "Stack store" instruction.
 -- Store a word into the nth slot of the stack.
 -- Format:
--- | 5 bits (14 in decimal) | 1 bit (0) | 2 bits (ignored) | 8 bits | 8 bits
--- | 5 bits (14 in decimal) | 1 bit (1) | 2 bits (ignored) | 8 bits | 32 bits
+-- | 5 bits (14 in decimal) | 1 bit (0) | 2 bits (ignored) | 32 bits | 8 bits
+-- | 5 bits (14 in decimal) | 1 bit (1) | 2 bits (ignored) | 32 bits | 32 bits
 sst :: Evaluator ()
 sst = do
   sp <- fetchTest 5
