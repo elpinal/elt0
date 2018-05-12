@@ -55,6 +55,7 @@ data Inst
   | Shl Reg Numeric Numeric
   | Shr Reg Numeric Numeric
   | If  Reg Place
+  | Salloc Word32
   deriving (Eq, Show)
 
 newtype Program = Program [Block]
@@ -92,15 +93,16 @@ instance Display Inst where
   display = foldl1 (\x y -> x ++ " " ++ y) . display'
 
 display' :: Inst -> [String]
-display' (Mov r o)     = ["mov", display r, display o]
-display' (Add r o1 o2) = ["add", display r, display o1, display o2]
-display' (Sub r o1 o2) = ["sub", display r, display o1, display o2]
-display' (And r o1 o2) = ["and", display r, display o1, display o2]
-display' (Or  r o1 o2) = ["or" , display r, display o1, display o2]
-display' (Not r o)     = ["not", display r, display o]
-display' (Shl r o1 o2) = ["shl", display r, display o1, display o2]
-display' (Shr r o1 o2) = ["shr", display r, display o1, display o2]
-display' (If r p)      = ["if" , display r, "jmp", display p]
+display' (Mov r o)     = ["mov"   , display r, display o]
+display' (Add r o1 o2) = ["add"   , display r, display o1, display o2]
+display' (Sub r o1 o2) = ["sub"   , display r, display o1, display o2]
+display' (And r o1 o2) = ["and"   , display r, display o1, display o2]
+display' (Or  r o1 o2) = ["or"    , display r, display o1, display o2]
+display' (Not r o)     = ["not"   , display r, display o]
+display' (Shl r o1 o2) = ["shl"   , display r, display o1, display o2]
+display' (Shr r o1 o2) = ["shr"   , display r, display o1, display o2]
+display' (If r p)      = ["if"    , display r, "jmp", display p]
+display' (Salloc w)    = ["salloc", show w]
 
 instance Display Block where
   display (Block l is m) = l ++ ":\n" ++

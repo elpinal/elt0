@@ -38,6 +38,7 @@ data Mnemonic
   | TShl
   | TShr
   | TIf
+  | TSalloc
   deriving (Eq, Show)
 
 type TokenP = (Token, Position)
@@ -88,6 +89,7 @@ data TokenKind
   | Operand
   | NewlineLit
   | LabelLit
+  | WordLit
   deriving (Eq, Show)
 
 newtype Position = Position { getPosition :: (Int, Int) }
@@ -243,18 +245,19 @@ lexLetters p a @ (x : _) | isAsciiUpper x = throwE $ UpperNonReg a p
 lexLetters p a = return (f a, p)
   where
     f :: String -> Token
-    f "mov"  = Mnem TMov
-    f "add"  = Mnem TAdd
-    f "sub"  = Mnem TSub
-    f "and"  = Mnem TAnd
-    f "or"   = Mnem TOr
-    f "not"  = Mnem TNot
-    f "shl"  = Mnem TShl
-    f "shr"  = Mnem TShr
-    f "if"   = Mnem TIf
-    f "jmp"  = Jmp -- Notice that this is not Mnem.
-    f "halt" = Halt
-    f a = Ident a
+    f "mov"    = Mnem TMov
+    f "add"    = Mnem TAdd
+    f "sub"    = Mnem TSub
+    f "and"    = Mnem TAnd
+    f "or"     = Mnem TOr
+    f "not"    = Mnem TNot
+    f "shl"    = Mnem TShl
+    f "shr"    = Mnem TShr
+    f "if"     = Mnem TIf
+    f "salloc" = Mnem TSalloc
+    f "jmp"    = Jmp -- Notice that this is not Mnem.
+    f "halt"   = Halt
+    f a        = Ident a
 
 digitToWord :: Num a => Char -> a
 digitToWord = fromInteger . toInteger . digitToInt
@@ -358,15 +361,16 @@ inst = join $ predOption p
     p _ = Nothing
 
     f :: Mnemonic -> Parser Inst
-    f TMov = inst2op Mov
-    f TAdd = inst3opN Add
-    f TSub = inst3opN Sub
-    f TAnd = inst3opN And
-    f TOr  = inst3opN Or
-    f TNot = inst2opN Not
-    f TShl = inst3opN Shl
-    f TShr = inst3opN Shr
-    f TIf  = ifJmp
+    f TMov    = inst2op Mov
+    f TAdd    = inst3opN Add
+    f TSub    = inst3opN Sub
+    f TAnd    = inst3opN And
+    f TOr     = inst3opN Or
+    f TNot    = inst2opN Not
+    f TShl    = inst3opN Shl
+    f TShr    = inst3opN Shr
+    f TIf     = ifJmp
+    f TSalloc = salloc
 
 inst2opN :: (Reg -> Numeric -> a) -> Parser a
 inst2opN f = f <$> reg <*> numeric
@@ -379,6 +383,12 @@ inst3opN f = f <$> reg <*> numeric <*> numeric
 
 ifJmp :: Parser Inst
 ifJmp = If <$> (reg <* exactSkip Jmp) <*> place
+
+salloc :: Parser Inst
+salloc = Salloc <$> predExact w WordLit
+  where
+    w (Digits w) = Just w
+    w _ = Nothing
 
 reg :: Parser Reg
 reg = predEOF f
