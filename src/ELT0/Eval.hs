@@ -203,15 +203,20 @@ fetchOperand :: Bool -> Evaluator Word32
 fetchOperand False = fetchReg
 fetchOperand True  = fetchWord
 
--- Format:
--- | 5 bits (0) | 1 bit (0) | 2 bits (ignored) | 8 bits | 8 bits
--- | 5 bits (0) | 1 bit (1) | 2 bits (ignored) | 8 bits | 32 bits
-mov :: Evaluator ()
-mov = do
+-- Register-Operand (RO) format scheme, called ROs:
+-- For all o.
+-- | 5 bits (o) | 1 bit (0) | 2 bits (ignored) | 8 bits | 8 bits
+-- | 5 bits (o) | 1 bit (1) | 2 bits (ignored) | 8 bits | 32 bits
+ro :: (Word32 -> Word32) -> Evaluator ()
+ro f = do
   sp <- fetchTest 5 -- an operand-format specifier
   r <- fetchByte
   v <- fetchOperand sp
-  modifyReg r v
+  modifyReg r $ f v
+
+-- Format: ROs(0)
+mov :: Evaluator ()
+mov = ro id
 
 -- Register-Operand-Operand (ROO) format scheme, called ROOs:
 -- For all o.
@@ -247,15 +252,9 @@ bor :: Evaluator ()
 bor = roo (.|.)
 
 -- Bitwise "not" instruction.
--- Format:
--- | 5 bits (5) | 1 bit (0) | 2 bits (ignored) | 8 bits | 8 bits
--- | 5 bits (5) | 1 bit (1) | 2 bits (ignored) | 8 bits | 32 bits
+-- Format: ROs(5)
 bnot :: Evaluator ()
-bnot = do
-  sp <- fetchTest 5
-  r <- fetchByte
-  v <- fetchOperand sp
-  modifyReg r $ complement v
+bnot = ro complement
 
 toInt :: Word32 -> Int
 toInt = fromInteger . toInteger
