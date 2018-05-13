@@ -166,7 +166,7 @@ newtype Parser a = Parser { runParser :: [TokenP] -> Either ParseError (Maybe (a
 instance Functor Parser where
   fmap f (Parser p) = Parser p'
     where
-      p' ts = (fmap $ first f) <$> p ts
+      p' ts = fmap (first f) <$> p ts
 
 instance Applicative Parser where
   pure x = Parser $ \ts -> Right $ Just (x, ts)
@@ -263,7 +263,7 @@ lexLetters p a = return (f a, p)
     f "sst"    = Mnem TSst
     f "jmp"    = Jmp -- Notice that this is not Mnem.
     f "halt"   = Halt
-    f a        = Ident a
+    f s        = Ident s
 
 digitToWord :: Num a => Char -> a
 digitToWord = fromInteger . toInteger . digitToInt
@@ -283,22 +283,20 @@ mainParser s = runIdentity . runExceptT $ mainParser' s
 mainParser' :: Monad m => String -> ExceptT Error m Program
 mainParser' s = do
   ts <- withExceptT LexError $ ExceptT . return $ runLexer lexer s
-  p <- ExceptT . return $ ParseError +++ maybe (Program []) fst $ runParser parser $ ts
-  return $ p
+  ExceptT . return $ ParseError +++ maybe (Program []) fst $ runParser parser ts
 
 exactSkip :: Token -> Parser ()
 exactSkip x = Parser f
   where
     f (t : ts) | fromToken t == x = Right $ Just ((), ts)
-    f (t : ts) = Left . ExpectToken x $ Just t
+    f (t : _) = Left . ExpectToken x $ Just t
     f [] = Left $ ExpectToken x Nothing
 
 option :: Token -> Parser ()
 option x = Parser f
   where
     f (t : ts) | fromToken t == x = Right $ Just ((), ts)
-    f (t : ts) = Right Nothing
-    f [] = Right Nothing
+    f _ = Right Nothing
 
 predExact :: (Token -> Maybe a) -> TokenKind -> Parser a
 predExact p k = Parser f
@@ -394,10 +392,10 @@ ifJmp :: Parser Inst
 ifJmp = If <$> (reg <* exactSkip Jmp) <*> place
 
 word32 :: Parser Word32
-word32 = predExact w WordLit
+word32 = predExact f WordLit
   where
-    w (Digits w) = Just w
-    w _ = Nothing
+    f (Digits w) = Just w
+    f _ = Nothing
 
 salloc :: Parser Inst
 salloc = Salloc <$> word32
@@ -422,14 +420,14 @@ numeric = predExact f Numeric
   where
     f (Digits w) = Just $ wordN w
     f (RegToken w) = Just $ registerN w
-    f t = Nothing
+    f _ = Nothing
 
 place :: Parser Place
 place = predExact f Place
   where
     f (RegToken w) = Just $ registerP w
     f (Ident s) = Just $ labelP s
-    f t = Nothing
+    f _ = Nothing
 
 operand :: Parser Operand
 operand = predExact f Operand
@@ -437,7 +435,7 @@ operand = predExact f Operand
     f (Digits w) = Just $ wordO w
     f (RegToken w) = Just $ Register $ Reg w
     f (Ident s) = Just $ labelO s
-    f t = Nothing
+    f _ = Nothing
 
 runLexer :: Lexer a -> String -> Either LexError a
 runLexer l s = runStream s position $ runExceptT l
