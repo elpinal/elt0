@@ -28,14 +28,14 @@ inst :: Inst -> AddressBook -> Builder
 inst = undefined
 
 terminator :: Maybe Place -> AddressBook -> Builder
-terminator Nothing _ = word8 10
+terminator Nothing _              = word8 10
 terminator (Just (PRegister r)) _ = word8 9 <> reg r
-terminator (Just (PLabel s)) ab = word8 (9 .|. shiftL 1 5) <> word32BE (resolve s ab)
+terminator (Just (PLabel s)) ab   = word8 (setBit 9 5) <> word32BE (resolve s ab)
 
 reg :: Reg -> Builder
 reg (Reg w) = word8 w
 
 resolve :: String -> AddressBook -> Address
-resolve s ab = Map.findWithDefault e s ab
+resolve s = Map.findWithDefault e s
   where
     e = error $ "could not resolve a label (" ++ show s ++ ")"
