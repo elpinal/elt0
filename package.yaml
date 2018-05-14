@@ -21,6 +21,7 @@ description:         Please see the README on Github at <https://github.com/elpi
 dependencies:
 - base >= 4.7 && < 5
 - array >= 0.5.2.0
+- bytestring >= 0.10.8.2
 - containers >= 0.5.10.2
 - transformers >= 0.5.2.0
 
