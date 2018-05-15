@@ -8,6 +8,7 @@ module ELT0.Program
   , Place(..)
   , Val(..)
   , W(..)
+  , IsValue(..)
   , Display(..)
   , wordO
   , labelO
@@ -142,3 +143,18 @@ labelP = PLabel
 
 registerP :: Word8 -> Place
 registerP = PRegister . Reg
+
+class IsValue a where
+  isValue :: a -> Bool
+
+instance IsValue Operand where
+  isValue (Value _) = True
+  isValue (Register _) = False
+
+instance IsValue Place where
+  isValue (PLabel _) = True
+  isValue (PRegister _) = False
+
+instance IsValue Numeric where
+  isValue (NWord _) = True
+  isValue (NRegister _) = False
