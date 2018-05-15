@@ -5,6 +5,7 @@ module ELT0.Asm
 
 import Data.Bits
 import Data.ByteString.Builder
+import qualified Data.ByteString.Lazy as B
 import qualified Data.Map.Lazy as Map
 import Data.Monoid
 import Data.Word
@@ -19,7 +20,18 @@ type Address = Word32
 type AddressBook = Map.Map String Address
 
 accBlock :: AddressBook -> (Builder, AddressBook) -> Block -> (Builder, AddressBook)
-accBlock = undefined
+accBlock ab (prevB, prevAb) (Block l is mp) = (prevB <> block is mp ab, newAb)
+  where
+    -- FIXME:
+    -- It may be slow due to the conversion 'toLazyByteString'.
+    -- Moreover, the coercion from Int64 to Word32 can lead to unexpected behavior.
+    addr :: Word32
+    addr = fromInteger . toInteger . B.length $ toLazyByteString prevB
+
+    newAb :: AddressBook
+    newAb = if l `Map.member` prevAb
+      then error $ "duplicate labels: " ++ show l
+      else Map.insert l addr prevAb
 
 block :: [Inst] -> Maybe Place -> AddressBook -> Builder
 block is mp = foldMap inst is <> terminator mp
