@@ -11,24 +11,24 @@ main :: IO ()
 main = process
 
 process :: IO ()
-process = do
-  args <- getArgs
-  if null args
-    then repl
-    else mapM_ runFile args
+process = getArgs >>= f
+  where
+    f []   = repl
+    f args = mapM_ runFile args
 
 repl :: IO ()
 repl = forever $ do
-  putStr "> "
-  hFlush stdout
-  s <- getLine
-  putStr $ case mainParser s of
-    Right p -> display p
-    Left e -> show e ++ "\n"
+  prompt
+  stringify . mainParser <$> getLine >>= putStr
 
 runFile :: String -> IO ()
-runFile name = do
-  s <- readFile name
-  putStr $ case mainParser s of
-    Right p -> display p
-    Left e -> show e ++ "\n"
+runFile name = stringify . mainParser <$> readFile name >>= putStr
+
+prompt :: IO ()
+prompt = do
+  putStr "> "
+  hFlush stdout
+
+stringify :: (Show a, Display b) => Either a b -> String
+stringify (Right p) = display p
+stringify (Left e)  = show e ++ "\n"
