@@ -1,11 +1,14 @@
 module Main where
 
 import Control.Monad
+import Data.Array.IO
 import Data.ByteString.Builder
+import Data.Word
 import System.Environment
 import System.IO
 
 import ELT0.Asm
+import ELT0.Eval (run)
 import ELT0.Parser
 import ELT0.Program
 
@@ -17,6 +20,7 @@ process = getArgs >>= g
   where
     g ("fmt" : xs) = f xs
     g ("asm" : xs) = asm xs
+    g ("eval" : xs) = eval xs
     g (x : _) = fail $ "no such command: " ++  show x
     g [] = fail "no command specified"
 
@@ -46,3 +50,27 @@ asm [o, i] = mainParser <$> readFile i >>= f
     f (Right p) = withFile o WriteMode $ flip hPutBuilder $ assemble p
     f (Left e) = hPutStrLn stderr $ show e
 asm xs = fail $ "the number of arguments must be 2, but got " ++ show (length xs)
+
+eval :: [String] -> IO ()
+eval [i] = withFile i ReadMode f
+  where
+    f :: Handle -> IO ()
+    f hdl = do
+      size <- toInt <$> hFileSize hdl
+      a <- newArray_ (1, size) -- TODO: what happens for size = 0?
+      n <- hGetArray hdl a size -- TODO: should we consider 'n'?
+      a' <- mapIndices (1, toWord32 size) fromWord32 a >>= freeze
+      print $ run (a', 1)
+
+    -- FIXME: unsafe
+    toInt :: Integer -> Int
+    toInt = fromInteger . toInteger
+
+    -- FIXME: unsafe
+    toWord32 :: Int -> Word32
+    toWord32 = fromInteger . toInteger
+
+    -- FIXME: unsafe
+    fromWord32 :: Word32 -> Int
+    fromWord32 = fromInteger . toInteger
+eval xs = fail $ "the number of arguments must be 1, but got " ++ show (length xs)
