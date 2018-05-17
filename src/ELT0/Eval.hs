@@ -96,7 +96,7 @@ insertStack i w (h : s) = h : insertStack (i - 1) w s
 type Evaluator = MaybeT (State Machine)
 
 code :: [Word8] -> Code
-code l = (listArray (1, fromInteger . toInteger $ length l) l, 1)
+code l = (listArray (1, fromIntegral $ length l) l, 1)
 
 getCur :: Code -> Word8
 getCur (a, o) = a ! o
@@ -187,7 +187,7 @@ buildWord32 :: [Word8] -> Word32
 buildWord32 = foldl (\acc x -> shift acc 8 .|. toWord32 x) 0
   where
     toWord32 :: Word8 -> Word32
-    toWord32 = fromInteger . toInteger
+    toWord32 = fromIntegral
 
 fetchReg :: Evaluator Word32
 fetchReg = fetchByte >>= getVal
@@ -257,7 +257,7 @@ bnot :: Evaluator ()
 bnot = ro complement
 
 toInt :: Word32 -> Int
-toInt = fromInteger . toInteger
+toInt = fromIntegral
 
 -- Format: ROOs(6)
 -- Description: Logical left shift.

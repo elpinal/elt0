@@ -26,7 +26,7 @@ accBlock ab (prevB, prevAb) (Block l is mp) = (prevB <> block is mp ab, newAb)
     -- It may be slow due to the conversion 'toLazyByteString'.
     -- Moreover, the coercion from Int64 to Word32 can lead to unexpected behavior.
     addr :: Word32
-    addr = fromInteger . toInteger . B.length $ toLazyByteString prevB
+    addr = fromIntegral . B.length $ toLazyByteString prevB
 
     newAb :: AddressBook
     newAb = if l `Map.member` prevAb

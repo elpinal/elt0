@@ -64,13 +64,13 @@ eval [i] = withFile i ReadMode f
 
     -- FIXME: unsafe
     toInt :: Integer -> Int
-    toInt = fromInteger . toInteger
+    toInt = fromIntegral
 
     -- FIXME: unsafe
     toWord32 :: Int -> Word32
-    toWord32 = fromInteger . toInteger
+    toWord32 = fromIntegral
 
     -- FIXME: unsafe
     fromWord32 :: Word32 -> Int
-    fromWord32 = fromInteger . toInteger
+    fromWord32 = fromIntegral
 eval xs = fail $ "the number of arguments must be 1, but got " ++ show (length xs)
