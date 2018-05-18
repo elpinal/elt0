@@ -2,7 +2,6 @@ module Main where
 
 import Control.Monad
 import Data.Array.IO
-import Data.ByteString.Builder
 import Data.Word
 import System.Environment
 import System.IO
@@ -18,11 +17,11 @@ main = process
 process :: IO ()
 process = getArgs >>= g
   where
-    g ("fmt" : xs) = f xs
-    g ("asm" : xs) = asm xs
+    g ("fmt" : xs)  = f xs
+    g ("asm" : xs)  = asm xs
     g ("eval" : xs) = eval xs
-    g (x : _) = fail $ "no such command: " ++  show x
-    g [] = fail "no command specified"
+    g (x : _)       = fail $ "no such command: " ++ show x
+    g []            = fail "no command specified"
 
     f []   = repl
     f args = mapM_ runFile args

@@ -129,7 +129,7 @@ data Recorder = Recorder
 instance Semigroup Recorder where
   x <> y = Recorder
     { builder = builder x <> builder y
-    , holes = \a -> holes x a <> holes y (a + genericLength (builder x))
+    , holes = \a -> holes x a <> holes y (a + lengthR x)
     , book = book x <> book y
     }
 
