@@ -1,4 +1,4 @@
-module ELT0.Asm.Refined
+module ELT0.Asm
   ( assemble
   , B.hPut
   , resolve

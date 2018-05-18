@@ -7,7 +7,7 @@ import Data.Word
 import System.Environment
 import System.IO
 
-import ELT0.Asm.Refined
+import ELT0.Asm
 import ELT0.Eval (run)
 import ELT0.Parser
 import ELT0.Program
