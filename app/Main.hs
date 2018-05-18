@@ -7,7 +7,7 @@ import Data.Word
 import System.Environment
 import System.IO
 
-import ELT0.Asm
+import ELT0.Asm.Refined
 import ELT0.Eval (run)
 import ELT0.Parser
 import ELT0.Program
@@ -47,7 +47,7 @@ stringify (Left e)  = show e ++ "\n"
 asm :: [String] -> IO ()
 asm [o, i] = mainParser <$> readFile i >>= f
   where
-    f (Right p) = withFile o WriteMode $ flip hPutBuilder $ assemble p
+    f (Right p) = withFile o WriteMode $ flip hPut $ assemble p
     f (Left e) = hPutStrLn stderr $ show e
 asm xs = fail $ "the number of arguments must be 2, but got " ++ show (length xs)
 
