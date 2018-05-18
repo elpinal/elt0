@@ -1,6 +1,7 @@
 module ELT0.Asm
   ( assemble
   , B.hPut
+  , assemble'
   , resolve
   ) where
 
