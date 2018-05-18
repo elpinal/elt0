@@ -324,17 +324,17 @@ skipMany = void . many
 skipSome :: Alternative f => f a -> f ()
 skipSome = void . some
 
+newline :: Parser ()
+newline = skipSome $ option Newline
+
 parser :: Parser Program
 parser = space *> p <* space
   where
     space = skipMany $ option Newline
-    p = Program <$> ((:) <$> block <*> many (break *> block))
-    break = skipSome $ option Newline
+    p = Program <$> ((:) <$> block <*> many (newline *> block))
 
 block :: Parser Block
-block = Block <$> label <*> many (break *> inst) <*> (break *> end)
-  where
-    break = skipSome $ option Newline
+block = Block <$> label <*> many (newline *> inst) <*> (newline *> end)
 
 label :: Parser String
 label = predEOF p <* exactSkip Colon

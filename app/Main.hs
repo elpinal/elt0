@@ -58,7 +58,7 @@ eval [i] = withFile i ReadMode f
     f hdl = do
       size <- toInt <$> hFileSize hdl
       a <- newArray_ (1, size) -- TODO: what happens for size = 0?
-      n <- hGetArray hdl a size -- TODO: should we consider 'n'?
+      _ <- hGetArray hdl a size -- TODO: should we consider the returned size?
       a' <- mapIndices (1, toWord32 size) fromWord32 a >>= freeze
       print $ run (a', 1)
 

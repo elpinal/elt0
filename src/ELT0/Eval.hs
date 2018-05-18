@@ -92,6 +92,7 @@ accessStack w s = s `genericIndex` w
 insertStack :: Word32 -> Word32 -> Stack -> Stack
 insertStack 0 w (_ : s) = w : s
 insertStack i w (h : s) = h : insertStack (i - 1) w s
+insertStack _ _ [] = error "get stuck: empty stack"
 
 type Evaluator = MaybeT (State Machine)
 
@@ -170,6 +171,7 @@ instruction = readMask 0b11111 >>= f
     f 12 = sfree
     f 13 = sld
     f 14 = sst
+    f n = error $ "unknown opcode: " ++ show n
 
 modifyReg :: Word8 -> Word32 -> Evaluator ()
 modifyReg r v = lift $ modify $ mapFile $ Map.insert r v
@@ -327,9 +329,7 @@ salloc = inc >> fetchWord >>= loop
       | otherwise = pushWord 0 *> loop (cnt - 1)
 
 dropWord :: Evaluator ()
-dropWord = lift . modify $ mapStack f
-  where
-    f (_ : xs) = xs
+dropWord = lift . modify $ mapStack $ \(_ : xs) -> xs
 
 -- "Stack free" instruction.
 -- Format:

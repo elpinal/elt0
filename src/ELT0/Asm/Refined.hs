@@ -81,6 +81,7 @@ inst' (Shr r n1 n2) = rnn 7 r n1 n2
 inst' (Salloc w)    = word8 11 <> word32BE w
 inst' (Sfree  w)    = word8 12 <> word32BE w
 inst' (Sld  r w)    = word8 13 <> reg r <> word32BE w
+inst' _ = error "unreachable"
 
 rnn :: Word8 -> Reg -> Numeric -> Numeric -> Builder
 rnn opcode r n1 n2 = word8 (opcode .|. setIfValue n1 5 .|. setIfValue n2 6) <> reg r <> numeric n1 <> numeric n2
