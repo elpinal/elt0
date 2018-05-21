@@ -1,6 +1,11 @@
 module ELT0.Program
   ( Program(..)
   , Block(..)
+  , Type(..)
+  , Env(..)
+  , env
+  , File
+  , Stack
   , Inst(..)
   , Reg(..)
   , Operand(..)
@@ -19,10 +24,11 @@ module ELT0.Program
   , registerP
   ) where
 
+import qualified Data.Map.Lazy as Map
 import Data.Word
 
 newtype Reg = Reg Word8
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 newtype W = W Word32
   deriving (Eq, Show)
@@ -68,6 +74,32 @@ newtype Program = Program [Block]
 
 data Block = Block String [Inst] (Maybe Place)
   deriving (Eq, Show)
+
+data Type
+  -- | Word-sized unsigned integers.
+  = Int
+  -- |
+  -- Labels which, when jumped to, expect to have values described by @Env@
+  -- in the associated register.
+  | Code Env
+  deriving Eq
+
+data Env = Env
+  { file :: File
+  , stack :: Stack
+  }
+  deriving Eq
+
+-- | An empty 'Env'.
+env :: Env
+env = Env
+  { file = mempty
+  , stack = mempty
+  }
+
+type File = Map.Map Reg Type
+
+type Stack = [Maybe Type]
 
 class Display a where
   display :: a -> String
