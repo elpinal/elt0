@@ -102,58 +102,60 @@ type File = Map.Map Reg Type
 type Stack = [Maybe Type]
 
 class Display a where
+  displayS :: a -> ShowS
   display :: a -> String
+  display x = displayS x ""
 
 instance Display Reg where
-  display (Reg n) = 'R' : show n
+  displayS (Reg n) = showChar 'R' . shows n
 
 instance Display W where
-  display (W w) = show w
+  displayS (W w) = shows w
 
 instance Display Operand where
-  display (Register r) = display r
-  display (Value v) = display v
+  displayS (Register r) = displayS r
+  displayS (Value v) = displayS v
 
 instance Display Numeric where
-  display (NRegister r) = display r
-  display (NWord w) = display w
+  displayS (NRegister r) = displayS r
+  displayS (NWord w) = displayS w
 
 instance Display Val where
-  display (Word w) = display w
-  display (Label s) = s
+  displayS (Word w) = displayS w
+  displayS (Label s) = showString s
 
 instance Display Place where
-  display (PRegister r) = display r
-  display (PLabel s) = s
+  displayS (PRegister r) = displayS r
+  displayS (PLabel s) = showString s
 
 instance Display Inst where
-  display = foldl1 (\x y -> x ++ " " ++ y) . display'
+  displayS (Mov r o)     = showString "mov"    |.| displayS r |.| displayS o
+  displayS (Add r o1 o2) = showString "add"    |.| displayS r |.| displayS o1 |.| displayS o2
+  displayS (Sub r o1 o2) = showString "sub"    |.| displayS r |.| displayS o1 |.| displayS o2
+  displayS (And r o1 o2) = showString "and"    |.| displayS r |.| displayS o1 |.| displayS o2
+  displayS (Or  r o1 o2) = showString "or"     |.| displayS r |.| displayS o1 |.| displayS o2
+  displayS (Not r o)     = showString "not"    |.| displayS r |.| displayS o
+  displayS (Shl r o1 o2) = showString "shl"    |.| displayS r |.| displayS o1 |.| displayS o2
+  displayS (Shr r o1 o2) = showString "shr"    |.| displayS r |.| displayS o1 |.| displayS o2
+  displayS (If r p)      = showString "if"     |.| displayS r |.| showString "jmp" |.| displayS p
+  displayS (Salloc w)    = showString "salloc" |.| shows w
+  displayS (Sfree w)     = showString "sfree"  |.| shows w
+  displayS (Sld r w)     = showString "sld"    |.| displayS r |.| shows w
+  displayS (Sst w o)     = showString "sst"    |.| shows w |.| displayS o
 
-display' :: Inst -> [String]
-display' (Mov r o)     = ["mov"   , display r, display o]
-display' (Add r o1 o2) = ["add"   , display r, display o1, display o2]
-display' (Sub r o1 o2) = ["sub"   , display r, display o1, display o2]
-display' (And r o1 o2) = ["and"   , display r, display o1, display o2]
-display' (Or  r o1 o2) = ["or"    , display r, display o1, display o2]
-display' (Not r o)     = ["not"   , display r, display o]
-display' (Shl r o1 o2) = ["shl"   , display r, display o1, display o2]
-display' (Shr r o1 o2) = ["shr"   , display r, display o1, display o2]
-display' (If r p)      = ["if"    , display r, "jmp", display p]
-display' (Salloc w)    = ["salloc", show w]
-display' (Sfree w)     = ["sfree" , show w]
-display' (Sld r w)     = ["sld"   , display r, show w]
-display' (Sst w o)     = ["sst"   , show w, display o]
+(|.|) :: ShowS -> ShowS -> ShowS
+x |.| y = x . showChar ' ' . y
 
 instance Display Block where
-  display (Block l is m) = l ++ ":\n" ++
-                           foldr (\i s -> display i ++ "\n" ++ s) "" is
-                           ++ end m
+  displayS (Block l is m) = showString l . showString ":\n" .
+                           foldr (\i s -> displayS i . showChar '\n' . s) id is
+                           . end m
     where
-      end (Just p) = "jmp " ++ display p
-      end Nothing = "halt"
+      end (Just p) = showString "jmp " . displayS p
+      end Nothing = showString "halt"
 
 instance Display Program where
-  display (Program bs) = foldr (\b s -> display b ++ "\n\n" ++ s) "" bs
+  displayS (Program bs) = foldr (\b s -> displayS b . showString "\n\n" . s) id bs
 
 wordO :: Word32 -> Operand
 wordO = Value . Word . W
