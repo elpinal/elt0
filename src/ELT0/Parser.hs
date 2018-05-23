@@ -10,10 +10,12 @@ module ELT0.Parser
   , lexer
   , lex1
   , Token(..)
+  , TokenP
   , Mnemonic(..)
   , fromToken
   , Position
   , newPosition
+  , LexError
   ) where
 
 import Control.Applicative
@@ -59,7 +61,6 @@ data Token
   | Halt
   | Digits Word32 -- not followed by alphabets.
   -- | Zero -- not followed by alphanum.
-  | Newline
   | RegToken Word8
   | Colon
   | LBrace
@@ -94,7 +95,6 @@ data TokenKind
   | Numeric -- operands except labels, namely words and registers
   | Place   -- operands except words, namely labels and registers
   | Operand
-  | NewlineLit
   | LabelLit
   | WordLit
   deriving (Eq, Show)
@@ -204,7 +204,7 @@ lex1 = flip runKleisli () $ liftS getPos &&& liftS char >>> Kleisli g
     f p x | isDigit x      = lexWord p x
     f p x | isAsciiAlpha x = lift (while isAlphanum) >>= fmap Just . lexLetters p . (x :)
     f _ ' '                = lex1
-    f p '\n'               = return $ Just (Newline, p)
+    f _ '\n'               = lex1
     f p ':'                = return $ Just (Colon, p)
     f p ','                = return $ Just (Comma, p)
     f p '{'                = return $ Just (LBrace, p)
@@ -332,17 +332,11 @@ skipMany = void . many
 skipSome :: Alternative f => f a -> f ()
 skipSome = void . some
 
-newline :: Parser ()
-newline = skipSome $ option Newline
-
 parser :: Parser Program
-parser = space *> p <* space
-  where
-    space = skipMany $ option Newline
-    p = Program <$> ((:) <$> block <*> many (newline *> block))
+parser = Program <$> ((:) <$> block <*> many block)
 
 block :: Parser Block
-block = Block <$> label <*> many (newline *> inst) <*> (newline *> end)
+block = Block <$> label <*> many inst <*> end
 
 label :: Parser String
 label = predEOF p <* exactSkip Colon

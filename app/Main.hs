@@ -8,7 +8,7 @@ import System.IO
 
 import ELT0.Asm
 import ELT0.Eval (run)
-import ELT0.Parser
+import ELT0.Parser.Refined
 import ELT0.Program
 
 main :: IO ()
@@ -29,10 +29,10 @@ process = getArgs >>= g
 repl :: IO ()
 repl = forever $ do
   prompt
-  stringify . mainParser <$> getLine >>= putStr
+  stringify . fromString <$> getLine >>= putStr
 
 runFile :: String -> IO ()
-runFile name = stringify . mainParser <$> readFile name >>= putStr
+runFile name = stringify . fromString <$> readFile name >>= putStr
 
 prompt :: IO ()
 prompt = do
@@ -44,7 +44,7 @@ stringify (Right p) = display p
 stringify (Left e)  = show e ++ "\n"
 
 asm :: [String] -> IO ()
-asm [o, i] = mainParser <$> readFile i >>= f
+asm [o, i] = fromString <$> readFile i >>= f
   where
     f (Right p) = withFile o WriteMode $ flip hPut $ assemble p
     f (Left e) = hPutStrLn stderr $ show e
