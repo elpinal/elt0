@@ -62,6 +62,10 @@ data Token
   | Newline
   | RegToken Word8
   | Colon
+  | LBrace
+  | RBrace
+  | Comma
+  | IntType
   deriving (Eq, Show)
 
 data Error
@@ -202,6 +206,9 @@ lex1 = flip runKleisli () $ liftS getPos &&& liftS char >>> Kleisli g
     f _ ' '                = lex1
     f p '\n'               = return $ Just (Newline, p)
     f p ':'                = return $ Just (Colon, p)
+    f p ','                = return $ Just (Comma, p)
+    f p '{'                = return $ Just (LBrace, p)
+    f p '}'                = return $ Just (RBrace, p)
     f _ '%'                = lift (while (/= '\n')) >> lex1
     f p x                  = throwE $ IllegalChar x p
 
@@ -244,6 +251,7 @@ lexLetters p ('R' : ds) | let l = length ds, 0 < l, all isDigit ds =
       f :: Word16 -> Lexer TokenP
       f w | w > 255 = throwE $ InvalidReg ds p
       f w = return . at p $ RegToken . fromInteger $ toInteger w
+lexLetters p "Int" = return (IntType, p)
 lexLetters p a @ (x : _) | isAsciiUpper x = throwE $ UpperNonReg a p
 lexLetters p a = return (f a, p)
   where
