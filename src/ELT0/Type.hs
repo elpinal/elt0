@@ -4,6 +4,7 @@
 module ELT0.Type
   ( program
   , env
+  , fromProgram
   , Type(..)
   ) where
 
@@ -18,6 +19,12 @@ import Data.Word
 import ELT0.Program
 
 type Heap = Map.Map String Type
+
+fromProgram :: Program -> Heap
+fromProgram (Program bs) = Map.fromList $ map p bs
+  where
+    p :: Block -> (String, Type)
+    p (Block l e _ _) = (l, Code e)
 
 nth :: Word32 -> Stack -> Maybe Type
 nth w s | w < genericLength s = s `genericIndex` w

@@ -10,6 +10,7 @@ import ELT0.Asm
 import ELT0.Eval (run)
 import ELT0.Parser.Refined
 import ELT0.Program
+import ELT0.Type
 
 main :: IO ()
 main = process
@@ -17,11 +18,12 @@ main = process
 process :: IO ()
 process = getArgs >>= g
   where
-    g ("fmt" : xs)  = f xs
-    g ("asm" : xs)  = asm xs
-    g ("eval" : xs) = eval xs
-    g (x : _)       = fail $ "no such command: " ++ show x
-    g []            = fail "no command specified"
+    g ("fmt" : xs)       = f xs
+    g ("typecheck" : xs) = typecheck xs
+    g ("asm" : xs)       = asm xs
+    g ("eval" : xs)      = eval xs
+    g (x : _)            = fail $ "no such command: " ++ show x
+    g []                 = fail "no command specified"
 
     f []   = repl
     f args = mapM_ runFile args
@@ -42,6 +44,15 @@ prompt = do
 stringify :: (Show a, Display b) => Either a b -> String
 stringify (Right p) = display p
 stringify (Left e)  = show e ++ "\n"
+
+typecheck :: [String] -> IO ()
+typecheck [i] = fromString <$> readFile i >>= f
+  where
+    f (Right p) = case program p $ fromProgram p of
+                    Just () -> putStrLn "Successfully typechecked."
+                    Nothing -> putStrLn "Ill-typed program."
+    f (Left e) = hPutStrLn stderr $ show e
+typecheck xs = fail $ "the number of arguments must be 1, but got " ++ show (length xs)
 
 asm :: [String] -> IO ()
 asm [o, i] = fromString <$> readFile i >>= f
