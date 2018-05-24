@@ -87,7 +87,7 @@ instance Typed Inst () where
   typeOf (Sst w o)     = set w <$> typeOf o <*> getStack >>= liftMaybe >>= putStack
 
 block :: Block -> ReaderT Heap Maybe ()
-block (Block s is mp) = do
+block (Block s _ is mp) = do
   h <- ask
   mapReaderT (g h) $ mapM_ f is >> maybe (return ()) guardMatch mp
   where

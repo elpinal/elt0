@@ -25,7 +25,7 @@ type Address = Word32
 type AddressBook = Map.Map String Address
 
 accBlock :: Recorder -> Block -> Recorder
-accBlock prev (Block l is mp) = r { book = Map.insert l (lengthR prev) $ book r }
+accBlock prev (Block l _ is mp) = r { book = Map.insert l (lengthR prev) $ book r }
   where
     r = prev <> block is mp
 

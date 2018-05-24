@@ -335,8 +335,9 @@ skipSome = void . some
 parser :: Parser Program
 parser = Program <$> ((:) <$> block <*> many block)
 
+-- broken
 block :: Parser Block
-block = Block <$> label <*> many inst <*> end
+block = Block <$> label <*> return env <*> many inst <*> end
 
 label :: Parser String
 label = predEOF p <* exactSkip Colon

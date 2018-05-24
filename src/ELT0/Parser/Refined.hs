@@ -295,10 +295,11 @@ block = do
   case ms of
     Nothing -> return Nothing
     Just s -> do
+      e <- file
       fromMinimal colon
       is <- p
       mp <- terminator
-      return $ Just $ Prog.Block s is mp
+      return $ Just $ Prog.Block s e is mp
   where
     p = inst >>= maybe (return []) (\i -> (i :) <$> p)
 

@@ -24,6 +24,7 @@ module ELT0.Program
   , registerP
   ) where
 
+import Data.List
 import qualified Data.Map.Lazy as Map
 import Data.Word
 
@@ -72,7 +73,7 @@ data Inst
 newtype Program = Program [Block]
   deriving (Eq, Show)
 
-data Block = Block String [Inst] (Maybe Place)
+data Block = Block String Env [Inst] (Maybe Place)
   deriving (Eq, Show)
 
 data Type
@@ -82,13 +83,13 @@ data Type
   -- Labels which, when jumped to, expect to have values described by @Env@
   -- in the associated register.
   | Code Env
-  deriving Eq
+  deriving (Eq, Show)
 
 data Env = Env
   { file :: File
   , stack :: Stack
   }
-  deriving Eq
+  deriving (Eq, Show)
 
 -- | An empty 'Env'.
 env :: Env
@@ -146,11 +147,29 @@ instance Display Inst where
 (|.|) :: ShowS -> ShowS -> ShowS
 x |.| y = x . showChar ' ' . y
 
-instance Display Block where
-  displayS (Block l is m) = showString l . showString ":\n" .
-                           foldr (\i s -> displayS i . showChar '\n' . s) id is
-                           . end m
+displayBrace :: ShowS -> ShowS
+displayBrace s = showChar '{' . s . showChar '}'
+
+displayBrack :: ShowS -> ShowS
+displayBrack s = showChar '[' . s . showChar ']'
+
+instance Display Type where
+  displayS Int = showString "int"
+  displayS (Code e) = displayS e
+
+instance Display Env where
+  displayS e = f . s
     where
+      f = displayBrace $ foldr (\(r, t) acc -> displayS r . showString ": " . displayS t . acc) id . Map.assocs $ file e
+      s = displayBrack $ foldr (.) id $ intersperse (showString ", ") $ map slot $ stack e
+      -- "ns" stands for nonsense; see [Stack-Based Typed Assembly Language] (1998) by Morrisett et al.
+      slot Nothing = showString "ns"
+      slot (Just t) = displayS t
+
+instance Display Block where
+  displayS (Block l e is m) = showString l . displayS e . showString ":\n" .  x . end m
+    where
+      x = foldr (\i s -> displayS i . showChar '\n' . s) id is
       end (Just p) = showString "jmp " . displayS p
       end Nothing = showString "halt"
 
