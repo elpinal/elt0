@@ -23,11 +23,9 @@ module ELT0.Parser.Refined
   ) where
 
 import Control.Applicative
-import Control.Monad
 import Data.Bifunctor
 import Data.Functor
 import qualified Data.Map.Lazy as Map
-import Data.Maybe
 import Data.Word
 
 import qualified ELT0.Parser as P
@@ -295,7 +293,7 @@ block = do
   case ms of
     Nothing -> return Nothing
     Just s -> do
-      e <- file
+      e <- fromMinimal lBrace *> file
       fromMinimal colon
       is <- p
       mp <- terminator
