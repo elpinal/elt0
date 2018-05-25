@@ -11,8 +11,10 @@ spec :: Spec
 spec = do
   describe "program" $
     it "typechecks a program" $ do
-      Program []                                       `program` mempty                      `shouldBe` return ()
-      Program [Block "" [] Nothing]                    `program` Map.singleton "" (Code env) `shouldBe` return ()
-      Program [Block "" [Reg 1 `Mov` wordO 9] Nothing] `program` Map.singleton "" (Code env) `shouldBe` return ()
+      let block l is mp = Block l env is mp
 
-      Program [Block "" [Reg 1 `Mov` registerO 2] Nothing] `program` Map.singleton "" (Code env) `shouldBe` Nothing
+      Program []                                       `program` mempty                      `shouldBe` return ()
+      Program [block "" [] Nothing]                    `program` Map.singleton "" (Code env) `shouldBe` return ()
+      Program [block "" [Reg 1 `Mov` wordO 9] Nothing] `program` Map.singleton "" (Code env) `shouldBe` return ()
+
+      Program [block "" [Reg 1 `Mov` registerO 2] Nothing] `program` Map.singleton "" (Code env) `shouldBe` Nothing

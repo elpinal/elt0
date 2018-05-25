@@ -1,12 +1,5 @@
 module ELT0.Parser
-  ( mainParser
-  , runParser
-  , runLexer
-  , inst
-  , jmp
-  , label
-  , reg
-  , numeric
+  ( runLexer
   , lexer
   , lex1
   , Token(..)
@@ -24,11 +17,7 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Data.Char
-import Data.Functor
-import Data.Functor.Identity
 import Data.Word
-
-import ELT0.Program
 
 data Mnemonic
   = TMov
@@ -284,161 +273,6 @@ isAlphanum c = isAsciiAlpha c || isDigit c
 
 lexer :: Lexer [TokenP]
 lexer = lex1 >>= maybe (return []) (\t -> (t :) <$> lexer)
-
-mainParser :: String -> Either Error Program
-mainParser s = runIdentity . runExceptT $ mainParser' s
-
-mainParser' :: Monad m => String -> ExceptT Error m Program
-mainParser' s = do
-  ts <- withExceptT LexError $ ExceptT . return $ runLexer lexer s
-  ExceptT . return $ ParseError +++ maybe (Program []) fst $ runParser parser ts
-
-exactSkip :: Token -> Parser ()
-exactSkip x = Parser f
-  where
-    f (t : ts) | fromToken t == x = Right $ Just ((), ts)
-    f (t : _) = Left . ExpectToken x $ Just t
-    f [] = Left $ ExpectToken x Nothing
-
-option :: Token -> Parser ()
-option x = Parser f
-  where
-    f (t : ts) | fromToken t == x = Right $ Just ((), ts)
-    f _ = Right Nothing
-
-predExact :: (Token -> Maybe a) -> TokenKind -> Parser a
-predExact p k = Parser f
-  where
-    f (t : ts) = case p $ fromToken t of
-      (Just x) -> Right $ Just (x, ts)
-      Nothing -> Left $ Expect k $ Just t
-    f [] = Left $ Expect k Nothing
-
-predEOF :: (TokenP -> Either ParseError a) -> Parser a
-predEOF p = Parser f
-  where
-    f (t : ts) = Just . (\a -> (a, ts)) <$> p t
-    f [] = Right Nothing
-
-predOption :: (Token -> Maybe a) -> Parser a
-predOption p = Parser f
-  where
-    f (t : ts) = Right $ (\a -> (a, ts)) <$> p (fromToken t)
-    f [] = Right Nothing
-
-skipMany :: Alternative f => f a -> f ()
-skipMany = void . many
-
-skipSome :: Alternative f => f a -> f ()
-skipSome = void . some
-
-parser :: Parser Program
-parser = Program <$> ((:) <$> block <*> many block)
-
--- broken
-block :: Parser Block
-block = Block <$> label <*> return env <*> many inst <*> end
-
-label :: Parser String
-label = predEOF p <* exactSkip Colon
-  where
-    p (Ident s, _) = Right s
-    p t = Left $ Expect LabelLit $ Just t
-
-end :: Parser (Maybe Place)
-end = (halt $> Nothing) <|> (Just <$> jmp)
-
-halt :: Parser ()
-halt = predOption op
-  where
-    op Halt = Just ()
-    op _ = Nothing
-
-jmp :: Parser Place
-jmp = predExact op Mnemonic *> place
-  where
-    op Jmp = Just ()
-    op _ = Nothing
-
-inst :: Parser Inst
-inst = join $ predOption p
-  where
-    p :: Token -> Maybe (Parser Inst)
-    p (Mnem m) = Just $ f m
-    p _ = Nothing
-
-    f :: Mnemonic -> Parser Inst
-    f TMov    = inst2op Mov
-    f TAdd    = inst3opN Add
-    f TSub    = inst3opN Sub
-    f TAnd    = inst3opN And
-    f TOr     = inst3opN Or
-    f TNot    = inst2opN Not
-    f TShl    = inst3opN Shl
-    f TShr    = inst3opN Shr
-    f TIf     = ifJmp
-    f TSalloc = salloc
-    f TSfree  = sfree
-    f TSld    = sld
-    f TSst    = sst
-
-inst2opN :: (Reg -> Numeric -> a) -> Parser a
-inst2opN f = f <$> reg <*> numeric
-
-inst2op :: (Reg -> Operand -> a) -> Parser a
-inst2op f = f <$> reg <*> operand
-
-inst3opN :: (Reg -> Numeric -> Numeric -> a) -> Parser a
-inst3opN f = f <$> reg <*> numeric <*> numeric
-
-ifJmp :: Parser Inst
-ifJmp = If <$> (reg <* exactSkip Jmp) <*> place
-
-word32 :: Parser Word32
-word32 = predExact f WordLit
-  where
-    f (Digits w) = Just w
-    f _ = Nothing
-
-salloc :: Parser Inst
-salloc = Salloc <$> word32
-
-sfree :: Parser Inst
-sfree = Sfree <$> word32
-
-sld :: Parser Inst
-sld = Sld <$> reg <*> word32
-
-sst :: Parser Inst
-sst = Sst <$> word32 <*> operand
-
-reg :: Parser Reg
-reg = predEOF f
-  where
-    f (RegToken w, _) = return $ Reg w
-    f t = Left $ Expect RegisterLit $ return t
-
-numeric :: Parser Numeric
-numeric = predExact f Numeric
-  where
-    f (Digits w) = Just $ wordN w
-    f (RegToken w) = Just $ registerN w
-    f _ = Nothing
-
-place :: Parser Place
-place = predExact f Place
-  where
-    f (RegToken w) = Just $ registerP w
-    f (Ident s) = Just $ labelP s
-    f _ = Nothing
-
-operand :: Parser Operand
-operand = predExact f Operand
-  where
-    f (Digits w) = Just $ wordO w
-    f (RegToken w) = Just $ Register $ Reg w
-    f (Ident s) = Just $ labelO s
-    f _ = Nothing
 
 runLexer :: Lexer a -> String -> Either LexError a
 runLexer l s = runStream s position $ runExceptT l
