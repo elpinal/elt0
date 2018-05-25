@@ -206,7 +206,8 @@ lex1 = flip runKleisli () $ liftS getPos &&& liftS char >>> Kleisli g
     g :: (Position, Maybe Char) -> Lexer (Maybe TokenP)
     g (p, m) = maybe (return Nothing) (f p) m
 
-    f p x | isDigit x      = lexWord p x
+    f :: Position -> Char -> Lexer (Maybe TokenP)
+    f p x | isDigit x      = Just <$> lexWord p x
     f p x | isAsciiAlpha x = lift (while isAlphanum) >>= fmap Just . lexLetters p . (x :)
     f _ ' '                = lex1
     f _ '\n'               = lex1
@@ -218,13 +219,13 @@ lex1 = flip runKleisli () $ liftS getPos &&& liftS char >>> Kleisli g
     f p x                  = throwE $ IllegalChar x p
 
 -- Precondition: @isDigit x@ must hold.
-lexWord :: Position -> Char -> Lexer (Maybe TokenP)
+lexWord :: Position -> Char -> Lexer TokenP
 lexWord p x = do
   s <- lift $ while isDigit
   b <- lift notFollowedByLetter
   unless b $
     lift getPos >>= throwE . FollowedByAlpha (x : s)
-  fmap (Just . at p . Digits) $ lexDigits p (x : s) >>= validImm32 p
+  fmap (at p . Digits) $ lexDigits p (x : s) >>= validImm32 p
 
 -- Precondition: @n >= 0@ must hold.
 validImm32 :: Position -> Integer -> Lexer Word32
