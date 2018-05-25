@@ -1,4 +1,4 @@
-module ELT0.Parser.Refined
+module ELT0.Parser
   (
   -- * Minimals
     Minimal(..)

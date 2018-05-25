@@ -8,7 +8,7 @@ import System.IO
 
 import ELT0.Asm
 import ELT0.Eval (run)
-import ELT0.Parser.Refined
+import ELT0.Parser
 import ELT0.Program
 import ELT0.Type
 
