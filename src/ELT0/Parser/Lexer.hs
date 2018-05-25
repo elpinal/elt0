@@ -1,14 +1,26 @@
 module ELT0.Parser.Lexer
-  ( runLexer
+  (
+  -- * Lexers
+    Lexer
+  , runLexer
   , lexer
   , lex1
+
+  -- * Tokens
   , Token(..)
   , TokenP
   , Mnemonic(..)
   , fromToken
+
+  -- * Positions
   , Position
   , newPosition
+
+  -- * Errors
   , LexError
+
+  -- * Streams
+  , Stream
   ) where
 
 import Control.Applicative
@@ -35,6 +47,7 @@ data Mnemonic
   | TSst
   deriving (Eq, Show)
 
+-- | Positional tokens.
 type TokenP = (Token, Position)
 
 at :: Position -> Token -> TokenP
@@ -46,16 +59,15 @@ fromToken = fst
 data Token
   = Ident String
   | Mnem Mnemonic
-  | Jmp
-  | Halt
-  | Digits Word32 -- not followed by alphabets.
-  -- | Zero -- not followed by alphanum.
-  | RegToken Word8
+  | Jmp -- ^ a `jmp` mnemonic
+  | Halt -- ^ a `halt` mnemonic
+  | Digits Word32 -- ^ a word
+  | RegToken Word8 -- ^ a register
   | Colon
-  | LBrace
-  | RBrace
+  | LBrace -- ^ a left brace
+  | RBrace -- ^ a right brace
   | Comma
-  | IntType
+  | IntType -- ^ an int type
   deriving (Eq, Show)
 
 data Error
@@ -63,11 +75,14 @@ data Error
   | ParseError ParseError
   deriving (Eq, Show)
 
+-- | Errors produced by 'Lexer'.
 data LexError
   = ZeroStartDigits Position
   | IllegalChar Char Position
   | UpperNonReg String Position
-  -- represents a (digits) value of String which is followed at a position by some alphabet.
+  -- |
+  -- Represents a sequence of digits which is followed by alphabets.
+  -- The position indicates the starting point of the alphabets.
   | FollowedByAlpha String Position
   | InvalidReg String Position
   | OverflowImm32 Integer Position
@@ -182,6 +197,7 @@ instance Alternative Parser where
     where
       p ts = p1 ts >>= maybe (p2 ts) (Right . Just)
 
+-- | Tokenizes a token. It returns Nothing when no input is available.
 lex1 :: Lexer (Maybe TokenP)
 lex1 = flip runKleisli () $ liftS getPos &&& liftS char >>> Kleisli g
   where
@@ -271,8 +287,10 @@ isAsciiAlpha c = isAsciiUpper c || isAsciiLower c
 isAlphanum :: Char -> Bool
 isAlphanum c = isAsciiAlpha c || isDigit c
 
+-- | Tokenizes tokens.
 lexer :: Lexer [TokenP]
-lexer = lex1 >>= maybe (return []) (\t -> (t :) <$> lexer)
+lexer = lex1 >>= maybe (return []) ((<$> lexer) . (:))
 
+-- | Executes a 'Lexer' with 'String' as input.
 runLexer :: Lexer a -> String -> Either LexError a
 runLexer l s = runStream s position $ runExceptT l

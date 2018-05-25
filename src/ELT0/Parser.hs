@@ -20,6 +20,9 @@ module ELT0.Parser
   , fromString
   , parse
   , comma
+
+  -- * Errors
+  , Error
   ) where
 
 import Control.Applicative
@@ -319,5 +322,6 @@ parse i = case runParser program i of
     _ -> Left $ Trailing xs
   (Fail m e, _) -> Left $ Unexpected m e
 
+-- | Parses a program from 'String'.
 fromString :: String -> Either Error Prog.Program
 fromString s = first Lexer (runLexer lexer s) >>= parse

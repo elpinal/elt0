@@ -3,9 +3,10 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module ELT0.Type
   ( program
-  , env
+  , Heap
   , fromProgram
   , Type(..)
+  , env
   ) where
 
 import Control.Monad
