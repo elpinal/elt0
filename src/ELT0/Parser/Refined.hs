@@ -4,7 +4,7 @@ module ELT0.Parser.Refined
     Minimal(..)
   , minimal
   , Parse1(..)
-  , P.Token(..)
+  , L.Token(..)
   , (-|-)
 
   -- * Parsers
@@ -14,7 +14,7 @@ module ELT0.Parser.Refined
   , option
 
   -- * Positions
-  , P.newPosition
+  , L.newPosition
 
   -- * Actual parsers
   , fromString
@@ -28,7 +28,7 @@ import Data.Functor
 import qualified Data.Map.Lazy as Map
 import Data.Word
 
-import qualified ELT0.Parser as P
+import qualified ELT0.Parser.Lexer as L
 import qualified ELT0.Program as Prog
 
 data Parse1 a
@@ -37,7 +37,7 @@ data Parse1 a
   deriving (Eq, Show)
 
 data Minimal a = Minimal
-  { runMinimal :: P.Token -> Parse1 a
+  { runMinimal :: L.Token -> Parse1 a
   , expected :: [String]
   }
 
@@ -69,15 +69,15 @@ x -|- y = Minimal
   , expected = expected x ++ expected y
   }
 
-appMinimal :: Minimal a -> Maybe P.Token -> Maybe (Parse1 a)
+appMinimal :: Minimal a -> Maybe L.Token -> Maybe (Parse1 a)
 appMinimal = fmap . runMinimal
 
 data Parse a
   = Parsed a
-  | Fail (Maybe P.TokenP) [String]
+  | Fail (Maybe L.TokenP) [String]
   deriving (Eq, Show)
 
-data Parser a = Parser { runParser :: [P.TokenP] -> (Parse a, [P.TokenP]) }
+data Parser a = Parser { runParser :: [L.TokenP] -> (Parse a, [L.TokenP]) }
 
 instance Functor Parse where
   fmap f (Parsed x) = Parsed $ f x
@@ -140,7 +140,7 @@ orEof m = Parser $ first f . decons
         Other1 -> Fail (Just t) $ expected m
         Parsed1 x -> Parsed $ Just x
 
-minimal :: (P.Token -> Maybe a) -> [String] -> Minimal a
+minimal :: (L.Token -> Maybe a) -> [String] -> Minimal a
 minimal p e = Minimal
     { runMinimal = f
     , expected = e
@@ -148,7 +148,7 @@ minimal p e = Minimal
   where
     f = maybe Other1 Parsed1 . p
 
-token :: P.Token -> String -> Minimal ()
+token :: L.Token -> String -> Minimal ()
 token t s = minimal f [s]
   where
     f t0 = if t0 == t then return () else Nothing
@@ -156,14 +156,14 @@ token t s = minimal f [s]
 label :: Minimal String
 label = minimal f ["label"]
   where
-    f (P.Ident s) = return s
+    f (L.Ident s) = return s
     f _ = Nothing
 
 lBrace :: Minimal ()
-lBrace = token P.LBrace "left brace"
+lBrace = token L.LBrace "left brace"
 
 rBrace :: Minimal ()
-rBrace = token P.RBrace "right brace"
+rBrace = token L.RBrace "right brace"
 
 brace :: Parser a -> Parser a
 brace p = do
@@ -175,13 +175,13 @@ brace p = do
 register :: Minimal Prog.Reg
 register = minimal f ["register"]
   where
-    f (P.RegToken w) = return $ Prog.Reg w
+    f (L.RegToken w) = return $ Prog.Reg w
     f _ = Nothing
 
 word' :: Minimal Word32
 word' = minimal f ["word"]
   where
-    f (P.Digits w) = return w
+    f (L.Digits w) = return w
     f _ = Nothing
 
 word :: Minimal Prog.W
@@ -200,13 +200,13 @@ place :: Minimal Prog.Place
 place = Prog.PRegister <$> register -|- Prog.PLabel <$> label
 
 colon :: Minimal ()
-colon = token P.Colon "colon"
+colon = token L.Colon "colon"
 
 comma :: Minimal ()
-comma = token P.Comma "comma"
+comma = token L.Comma "comma"
 
 int :: Minimal ()
-int = token P.IntType $ show "int"
+int = token L.IntType $ show "int"
 
 typeM :: Minimal (Parser Prog.Type)
 typeM = int $> return Prog.Int -|- lBrace $> (Prog.Code <$> file)
@@ -253,34 +253,34 @@ row = do
 inst :: Parser (Maybe Prog.Inst)
 inst = do
   ma <- option $ foldl1 (-|-)
-    [ f P.TMov "mov" $> (Prog.Mov <$> fromMinimal register <*> fromMinimal operand)
-    , f P.TAdd "add" $> rnn Prog.Add
-    , f P.TSub "sub" $> rnn Prog.Sub
-    , f P.TAnd "and" $> rnn Prog.And
-    , f P.TOr  "or"  $> rnn Prog.Or
-    , f P.TNot "not" $> (Prog.Not <$> fromMinimal register <*> fromMinimal numeric)
-    , f P.TShl "shl" $> rnn Prog.Shl
-    , f P.TShr "shr" $> rnn Prog.Shr
-    , f P.TIf  "if"  $> (Prog.If <$> fromMinimal register <*> fromMinimal place)
-    , f P.TSalloc "salloc" $> (Prog.Salloc <$> fromMinimal word')
-    , f P.TSfree  "sfree"  $> (Prog.Sfree <$> fromMinimal word')
-    , f P.TSld "sld" $> (Prog.Sld <$> fromMinimal register <*> fromMinimal word')
-    , f P.TSst "sst" $> (Prog.Sst <$> fromMinimal word' <*> fromMinimal operand)
+    [ f L.TMov "mov" $> (Prog.Mov <$> fromMinimal register <*> fromMinimal operand)
+    , f L.TAdd "add" $> rnn Prog.Add
+    , f L.TSub "sub" $> rnn Prog.Sub
+    , f L.TAnd "and" $> rnn Prog.And
+    , f L.TOr  "or"  $> rnn Prog.Or
+    , f L.TNot "not" $> (Prog.Not <$> fromMinimal register <*> fromMinimal numeric)
+    , f L.TShl "shl" $> rnn Prog.Shl
+    , f L.TShr "shr" $> rnn Prog.Shr
+    , f L.TIf  "if"  $> (Prog.If <$> fromMinimal register <*> fromMinimal place)
+    , f L.TSalloc "salloc" $> (Prog.Salloc <$> fromMinimal word')
+    , f L.TSfree  "sfree"  $> (Prog.Sfree <$> fromMinimal word')
+    , f L.TSld "sld" $> (Prog.Sld <$> fromMinimal register <*> fromMinimal word')
+    , f L.TSst "sst" $> (Prog.Sst <$> fromMinimal word' <*> fromMinimal operand)
     ]
   maybe (return Nothing) (fmap Just) ma
   where
     f t e = minimal (g t) [e]
-    g m0 (P.Mnem m) = if m == m0 then return () else Nothing
+    g m0 (L.Mnem m) = if m == m0 then return () else Nothing
     g _ _ =  Nothing
 
 rnn :: (Prog.Reg -> Prog.Numeric -> Prog.Numeric -> Prog.Inst) -> Parser Prog.Inst
 rnn f = f <$> fromMinimal register <*> fromMinimal numeric <*> fromMinimal numeric
 
 halt :: Minimal ()
-halt = token P.Halt "halt"
+halt = token L.Halt "halt"
 
 jmp :: Minimal ()
-jmp = token P.Jmp "jmp"
+jmp = token L.Jmp "jmp"
 
 terminator :: Parser (Maybe Prog.Place)
 terminator = do
@@ -307,12 +307,12 @@ program = Prog.Program <$> p
     p = block >>= maybe (return []) (\b -> (b :) <$> p)
 
 data Error
-  = Unexpected (Maybe P.TokenP) [String]
-  | Trailing [P.TokenP]
-  | Lexer P.LexError
+  = Unexpected (Maybe L.TokenP) [String]
+  | Trailing [L.TokenP]
+  | Lexer L.LexError
   deriving (Eq, Show)
 
-parse :: [P.TokenP] -> Either Error Prog.Program
+parse :: [L.TokenP] -> Either Error Prog.Program
 parse i = case runParser program i of
   (Parsed p, xs) -> case xs of
     [] -> return p
@@ -320,4 +320,4 @@ parse i = case runParser program i of
   (Fail m e, _) -> Left $ Unexpected m e
 
 fromString :: String -> Either Error Prog.Program
-fromString s = first Lexer (P.runLexer P.lexer s) >>= parse
+fromString s = first Lexer (L.runLexer L.lexer s) >>= parse

@@ -1,4 +1,4 @@
-module ELT0.Parser
+module ELT0.Parser.Lexer
   ( runLexer
   , lexer
   , lex1
