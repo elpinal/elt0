@@ -32,7 +32,7 @@ import qualified Data.Map.Lazy as Map
 import Data.Word
 
 import ELT0.Parser.Lexer
-import qualified ELT0.Program as Prog
+import ELT0.Program
 
 data Parse1 a
   = Parsed1 a
@@ -175,10 +175,10 @@ brace p = do
   fromMinimal rBrace
   return x
 
-register :: Minimal Prog.Reg
+register :: Minimal Reg
 register = minimal f ["register"]
   where
-    f (RegToken w) = return $ Prog.Reg w
+    f (RegToken w) = return $ Reg w
     f _ = Nothing
 
 word' :: Minimal Word32
@@ -187,20 +187,20 @@ word' = minimal f ["word"]
     f (Digits w) = return w
     f _ = Nothing
 
-word :: Minimal Prog.W
-word = Prog.W <$> word'
+word :: Minimal W
+word = W <$> word'
 
-value :: Minimal Prog.Val
-value = Prog.Word <$> word -|- Prog.Label <$> label
+value :: Minimal Val
+value = Word <$> word -|- Label <$> label
 
-operand :: Minimal Prog.Operand
-operand = Prog.Register <$> register -|- Prog.Value <$> value
+operand :: Minimal Operand
+operand = Register <$> register -|- Value <$> value
 
-numeric :: Minimal Prog.Numeric
-numeric = Prog.NRegister <$> register -|- Prog.NWord <$> word
+numeric :: Minimal Numeric
+numeric = NRegister <$> register -|- NWord <$> word
 
-place :: Minimal Prog.Place
-place = Prog.PRegister <$> register -|- Prog.PLabel <$> label
+place :: Minimal Place
+place = PRegister <$> register -|- PLabel <$> label
 
 colon :: Minimal ()
 colon = token Colon "colon"
@@ -211,16 +211,16 @@ comma = token Comma "comma"
 int :: Minimal ()
 int = token IntType $ show "int"
 
-typeM :: Minimal (Parser Prog.Type)
-typeM = int $> return Prog.Int -|- lBrace $> (Prog.Code <$> file)
+typeM :: Minimal (Parser Type)
+typeM = int $> return Int -|- lBrace $> (Code <$> parseFile)
 
-typ :: Parser Prog.Type
+typ :: Parser Type
 typ = do
   a <- fromMinimal typeM
   a
 
-file :: Parser Prog.Env
-file = do
+parseFile :: Parser Env
+parseFile = do
   e <- row1 >>= p
   fromMinimal rBrace
   return e
@@ -231,12 +231,12 @@ file = do
         Just () -> (:) <$> row <*> rows
         Nothing -> return []
 
-    p Nothing = return Prog.env
+    p Nothing = return env
     p (Just x) = do
       xs <- rows
-      return $ Prog.env { Prog.file = Map.fromList $ x : xs }
+      return $ env { file = Map.fromList $ x : xs }
 
-row1 :: Parser (Maybe (Prog.Reg, Prog.Type))
+row1 :: Parser (Maybe (Reg, Type))
 row1 = do
   mr <- option register
   case mr of
@@ -246,29 +246,29 @@ row1 = do
       t <- typ
       return $ Just (r, t)
 
-row :: Parser (Prog.Reg, Prog.Type)
+row :: Parser (Reg, Type)
 row = do
   r <- fromMinimal register
   fromMinimal colon
   t <- typ
   return (r, t)
 
-inst :: Parser (Maybe Prog.Inst)
+inst :: Parser (Maybe Inst)
 inst = do
   ma <- option $ foldl1 (-|-)
-    [ f TMov "mov" $> (Prog.Mov <$> fromMinimal register <*> fromMinimal operand)
-    , f TAdd "add" $> rnn Prog.Add
-    , f TSub "sub" $> rnn Prog.Sub
-    , f TAnd "and" $> rnn Prog.And
-    , f TOr  "or"  $> rnn Prog.Or
-    , f TNot "not" $> (Prog.Not <$> fromMinimal register <*> fromMinimal numeric)
-    , f TShl "shl" $> rnn Prog.Shl
-    , f TShr "shr" $> rnn Prog.Shr
-    , f TIf  "if"  $> (Prog.If <$> fromMinimal register <*> fromMinimal place)
-    , f TSalloc "salloc" $> (Prog.Salloc <$> fromMinimal word')
-    , f TSfree  "sfree"  $> (Prog.Sfree <$> fromMinimal word')
-    , f TSld "sld" $> (Prog.Sld <$> fromMinimal register <*> fromMinimal word')
-    , f TSst "sst" $> (Prog.Sst <$> fromMinimal word' <*> fromMinimal operand)
+    [ f TMov "mov" $> (Mov <$> fromMinimal register <*> fromMinimal operand)
+    , f TAdd "add" $> rnn Add
+    , f TSub "sub" $> rnn Sub
+    , f TAnd "and" $> rnn And
+    , f TOr  "or"  $> rnn Or
+    , f TNot "not" $> (Not <$> fromMinimal register <*> fromMinimal numeric)
+    , f TShl "shl" $> rnn Shl
+    , f TShr "shr" $> rnn Shr
+    , f TIf  "if"  $> (If <$> fromMinimal register <*> fromMinimal place)
+    , f TSalloc "salloc" $> (Salloc <$> fromMinimal word')
+    , f TSfree  "sfree"  $> (Sfree <$> fromMinimal word')
+    , f TSld "sld" $> (Sld <$> fromMinimal register <*> fromMinimal word')
+    , f TSst "sst" $> (Sst <$> fromMinimal word' <*> fromMinimal operand)
     ]
   maybe (return Nothing) (fmap Just) ma
   where
@@ -276,7 +276,7 @@ inst = do
     g m0 (Mnem m) = if m == m0 then return () else Nothing
     g _ _ =  Nothing
 
-rnn :: (Prog.Reg -> Prog.Numeric -> Prog.Numeric -> Prog.Inst) -> Parser Prog.Inst
+rnn :: (Reg -> Numeric -> Numeric -> Inst) -> Parser Inst
 rnn f = f <$> fromMinimal register <*> fromMinimal numeric <*> fromMinimal numeric
 
 halt :: Minimal ()
@@ -285,27 +285,27 @@ halt = token Halt "halt"
 jmp :: Minimal ()
 jmp = token Jmp "jmp"
 
-terminator :: Parser (Maybe Prog.Place)
+terminator :: Parser (Maybe Place)
 terminator = do
   a <- fromMinimal $ halt $> return Nothing -|- jmp $> (Just <$> fromMinimal place)
   a
 
-block :: Parser (Maybe Prog.Block)
+block :: Parser (Maybe Block)
 block = do
   ms <- option label
   case ms of
     Nothing -> return Nothing
     Just s -> do
-      e <- fromMinimal lBrace *> file
+      e <- fromMinimal lBrace *> parseFile
       fromMinimal colon
       is <- p
       mp <- terminator
-      return $ Just $ Prog.Block s e is mp
+      return $ Just $ Block s e is mp
   where
     p = inst >>= maybe (return []) (\i -> (i :) <$> p)
 
-program :: Parser Prog.Program
-program = Prog.Program <$> p
+program :: Parser Program
+program = Program <$> p
   where
     p = block >>= maybe (return []) (\b -> (b :) <$> p)
 
@@ -315,7 +315,7 @@ data Error
   | Lexer LexError
   deriving (Eq, Show)
 
-parse :: [TokenP] -> Either Error Prog.Program
+parse :: [TokenP] -> Either Error Program
 parse i = case runParser program i of
   (Parsed p, xs) -> case xs of
     [] -> return p
@@ -323,5 +323,5 @@ parse i = case runParser program i of
   (Fail m e, _) -> Left $ Unexpected m e
 
 -- | Parses a program from 'String'.
-fromString :: String -> Either Error Prog.Program
+fromString :: String -> Either Error Program
 fromString s = first Lexer (runLexer lexer s) >>= parse
