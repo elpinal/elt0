@@ -158,10 +158,13 @@ instance Display Type where
   displayS (Code e) = displayS e
 
 instance Display Env where
-  displayS e = f . s
+  displayS e = f (file e) . s (stack e)
     where
-      f = displayBrace $ foldr (\(r, t) acc -> displayS r . showString ": " . displayS t . acc) id . Map.assocs $ file e
-      s = displayBrack $ foldr (.) id $ intersperse (showString ", ") $ map slot $ stack e
+      f i = if i == mempty then id else displayBrace $ j $ map pair $ Map.assocs i
+      s i = if i == mempty then id else displayBrack $ j $ map slot i
+
+      j = foldr (.) id . intersperse (showString ", ")
+      pair (r, t) = displayS r . showString ": " . displayS t
       -- "ns" stands for nonsense; see [Stack-Based Typed Assembly Language] (1998) by Morrisett et al.
       slot Nothing = showString "ns"
       slot (Just t) = displayS t
