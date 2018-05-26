@@ -66,8 +66,12 @@ data Token
   | Colon
   | LBrace -- ^ a left brace
   | RBrace -- ^ a right brace
+  | LBrack -- ^ a left brack
+  | RBrack -- ^ a right brack
   | Comma
   | IntType -- ^ an int type
+  | NS -- ^ nonsense
+  | CodeType
   deriving (Eq, Show)
 
 data Error
@@ -215,6 +219,8 @@ lex1 = flip runKleisli () $ liftS getPos &&& liftS char >>> Kleisli g
     f p ','                = return $ Just (Comma, p)
     f p '{'                = return $ Just (LBrace, p)
     f p '}'                = return $ Just (RBrace, p)
+    f p '['                = return $ Just (LBrack, p)
+    f p ']'                = return $ Just (RBrack, p)
     f _ '%'                = lift (while (/= '\n')) >> lex1
     f p x                  = throwE $ IllegalChar x p
 
@@ -258,6 +264,7 @@ lexLetters p ('R' : ds) | let l = length ds, 0 < l, all isDigit ds =
       f w | w > 255 = throwE $ InvalidReg ds p
       f w = return . at p $ RegToken . fromInteger $ toInteger w
 lexLetters p "Int" = return (IntType, p)
+lexLetters p "Code" = return (CodeType, p)
 lexLetters p a @ (x : _) | isAsciiUpper x = throwE $ UpperNonReg a p
 lexLetters p a = return (f a, p)
   where

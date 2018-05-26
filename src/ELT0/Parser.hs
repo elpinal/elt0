@@ -29,6 +29,7 @@ import Control.Applicative
 import Data.Bifunctor
 import Data.Functor
 import qualified Data.Map.Lazy as Map
+import Data.Maybe
 import Data.Word
 
 import ELT0.Parser.Lexer
@@ -175,6 +176,12 @@ brace p = do
   fromMinimal rBrace
   return x
 
+lBrack :: Minimal ()
+lBrack = token LBrack "left brack"
+
+rBrack :: Minimal ()
+rBrack = token RBrack "right brack"
+
 register :: Minimal Reg
 register = minimal f ["register"]
   where
@@ -211,15 +218,18 @@ comma = token Comma "comma"
 int :: Minimal ()
 int = token IntType $ show "int"
 
+code :: Minimal ()
+code = token CodeType $ show "code"
+
 typeM :: Minimal (Parser Type)
-typeM = int $> return Int -|- lBrace $> (Code <$> parseFile)
+typeM = int $> return Int -|- code $> (Code <$> parseEnv)
 
 typ :: Parser Type
 typ = do
   a <- fromMinimal typeM
   a
 
-parseFile :: Parser Env
+parseFile :: Parser File
 parseFile = do
   e <- row1 >>= p
   fromMinimal rBrace
@@ -231,10 +241,10 @@ parseFile = do
         Just () -> (:) <$> row <*> rows
         Nothing -> return []
 
-    p Nothing = return env
+    p Nothing = return mempty
     p (Just x) = do
       xs <- rows
-      return $ env { file = Map.fromList $ x : xs }
+      return $ Map.fromList $ x : xs
 
 row1 :: Parser (Maybe (Reg, Type))
 row1 = do
@@ -252,6 +262,49 @@ row = do
   fromMinimal colon
   t <- typ
   return (r, t)
+
+parseStack :: Parser Stack
+parseStack = (slot1 >>= p) <* fromMinimal rBrack
+  where
+    p Nothing = return mempty
+    p (Just x) = (x :) <$> slots
+
+    slots = do
+      m <- option comma
+      case m of
+        Just () -> (:) <$> slot <*> slots
+        Nothing -> return []
+
+slot1 :: Parser (Maybe (Maybe Type))
+slot1 = do
+  ma <- option slotM
+  case ma of
+    Nothing -> return Nothing
+    Just a -> Just <$> a
+
+slot :: Parser (Maybe Type)
+slot = do
+  a <- fromMinimal slotM
+  a
+
+slotM :: Minimal (Parser (Maybe Type))
+slotM = fmap Just <$> typeM -|- ns $> return Nothing
+
+ns :: Minimal ()
+ns = token NS "ns"
+
+(^>) :: Monad m => m (Maybe a) -> m b -> m (Maybe b)
+x ^> y = x >>= maybe (return Nothing) (const $ Just <$> y)
+
+parseEnv :: Parser Env
+parseEnv = do
+  fromMinimal code
+  mf <- option lBrace ^> parseFile
+  ms <- option lBrack ^> parseStack
+  return $ Env
+    { file = fromMaybe mempty mf
+    , stack = fromMaybe mempty ms
+    }
 
 inst :: Parser (Maybe Inst)
 inst = do
@@ -296,7 +349,7 @@ block = do
   case ms of
     Nothing -> return Nothing
     Just s -> do
-      e <- fromMinimal lBrace *> parseFile
+      e <- parseEnv
       fromMinimal colon
       is <- p
       mp <- terminator
