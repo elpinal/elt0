@@ -73,9 +73,6 @@ x -|- y = Minimal
   , expected = expected x ++ expected y
   }
 
-appMinimal :: Minimal a -> Maybe Token -> Maybe (Parse1 a)
-appMinimal = fmap . runMinimal
-
 data Parse a
   = Parsed a
   | Fail (Maybe TokenP) [String]
@@ -135,15 +132,6 @@ option m = Parser $ f . decons
         Other1 -> (Parsed Nothing, cons mt rest)
         Parsed1 x -> (Parsed $ Just x, rest)
 
-orEof :: Minimal a -> Parser (Maybe a)
-orEof m = Parser $ first f . decons
-  where
-    f Nothing = Parsed Nothing
-    f (Just t) =
-      case runMinimal m $ fst t of
-        Other1 -> Fail (Just t) $ expected m
-        Parsed1 x -> Parsed $ Just x
-
 minimal :: (Token -> Maybe a) -> [String] -> Minimal a
 minimal p e = Minimal
     { runMinimal = f
@@ -168,13 +156,6 @@ lBrace = token LBrace "left brace"
 
 rBrace :: Minimal ()
 rBrace = token RBrace "right brace"
-
-brace :: Parser a -> Parser a
-brace p = do
-  fromMinimal lBrace
-  x <- p
-  fromMinimal rBrace
-  return x
 
 lBrack :: Minimal ()
 lBrack = token LBrack "left brack"
