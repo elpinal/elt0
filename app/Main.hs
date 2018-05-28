@@ -3,6 +3,7 @@ module Main where
 import Control.Exception.Safe
 import Control.Monad.IO.Class
 import Data.Array.IO
+import qualified Data.Map.Lazy as Map
 import Data.Word
 import System.Environment
 import System.IO
@@ -26,20 +27,30 @@ instance Exception CommandException
 main :: IO ()
 main = process
 
+type CommandTable a = Map.Map String ([String] -> a ())
+
 process :: (MonadIO m, MonadThrow m) => m ()
 process = liftIO getArgs >>= f
   where
-    f ("eval" : xs)      = eval xs
-    f ("fmt" : xs)       = fmt xs
-    f ("primitive" : xs) = primitive xs
-    f (x : _)            = throwM $ NoCommand x
-    f []                 = liftIO $ mapM_ putStrLn ["eval", "fmt", "primitive"]
+    f (x : xs) = Map.findWithDefault (const . throwM $ NoCommand x) x commands xs
+    f []       = liftIO $ mapM_ putStrLn $ Map.keys (commands :: CommandTable IO)
+
+commands :: (MonadIO m, MonadThrow m) => CommandTable m
+commands = Map.fromList
+  [ ("eval", eval)
+  , ("fmt", fmt)
+  , ("primitive", primitive)
+  ]
 
 primitive :: (MonadIO m, MonadThrow m) => [String] -> m ()
-primitive ("asm" : xs)       = asm xs
-primitive ("typecheck" : xs) = typecheck xs
-primitive (x : _)            = throwM $ NoPrimitive x
-primitive []                 = liftIO $ mapM_ putStrLn ["asm", "typecheck"]
+primitive (x : xs) = Map.findWithDefault (const . throwM $ NoPrimitive x) x prims xs
+primitive []       = liftIO $ mapM_ putStrLn $ Map.keys (prims :: CommandTable IO)
+
+prims :: (MonadIO m, MonadThrow m) => CommandTable m
+prims = Map.fromList
+  [ ("asm", asm)
+  , ("typecheck", typecheck)
+  ]
 
 typecheck :: (MonadIO m, MonadThrow m) => [String] -> m ()
 typecheck [i] = readAsm i >>= f
