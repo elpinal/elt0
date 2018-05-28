@@ -20,9 +20,15 @@ data CommandException
   | TypeCheckException FilePath
   | NoCommand String
   | NoPrimitive String
-  deriving Show
 
 instance Exception CommandException
+
+instance Show CommandException where
+  show (ParseException p e)   = show p ++ ": parse error: " ++ show e
+  show (ArgNumException e g)  = "the number of arguments must be " ++ show e ++ ", but got " ++ show g
+  show (TypeCheckException p) = "ill-typed: " ++ show p
+  show (NoCommand s)          = "no such command: " ++ show s
+  show (NoPrimitive s)        = "no such primitive: " ++ show s
 
 main :: IO ()
 main = process
