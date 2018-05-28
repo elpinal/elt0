@@ -18,15 +18,20 @@ main = process
 process :: IO ()
 process = getArgs >>= g
   where
-    g ("fmt" : xs)       = f xs
-    g ("typecheck" : xs) = typecheck xs
-    g ("asm" : xs)       = asm xs
     g ("eval" : xs)      = eval xs
+    g ("fmt" : xs)       = f xs
+    g ("primitive" : xs) = primitive xs
     g (x : _)            = fail $ "no such command: " ++ show x
     g []                 = fail "no command specified"
 
     f []   = repl
     f args = mapM_ runFile args
+
+primitive :: [String] -> IO ()
+primitive ("asm" : xs)       = asm xs
+primitive ("typecheck" : xs) = typecheck xs
+primitive (x : _)            = fail $ "no such primitive: " ++ show x
+primitive []                 = mapM_ putStrLn ["asm", "typecheck"]
 
 repl :: IO ()
 repl = forever $ do
