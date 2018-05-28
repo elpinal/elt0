@@ -57,14 +57,14 @@ typecheck [i] = fromString <$> readFile i >>= f
                     Just () -> putStrLn "Successfully typechecked."
                     Nothing -> putStrLn "Ill-typed program."
     f (Left e) = hPutStrLn stderr $ show e
-typecheck xs = fail $ "the number of arguments must be 1, but got " ++ show (length xs)
+typecheck xs = argMismatch 1 xs
 
 asm :: [String] -> IO ()
 asm [o, i] = fromString <$> readFile i >>= f
   where
     f (Right p) = withFile o WriteMode $ flip hPut $ assemble p
     f (Left e) = hPutStrLn stderr $ show e
-asm xs = fail $ "the number of arguments must be 2, but got " ++ show (length xs)
+asm xs = argMismatch 2 xs
 
 eval :: [String] -> IO ()
 eval [i] = withFile i ReadMode f
@@ -88,4 +88,7 @@ eval [i] = withFile i ReadMode f
     -- FIXME: unsafe
     fromWord32 :: Word32 -> Int
     fromWord32 = fromIntegral
-eval xs = fail $ "the number of arguments must be 1, but got " ++ show (length xs)
+eval xs = argMismatch 1 xs
+
+argMismatch :: Int -> [a] -> IO ()
+argMismatch n xs = fail $ "the number of arguments must be " ++ show n ++ ", but got " ++ show (length xs)
