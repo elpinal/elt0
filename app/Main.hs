@@ -45,8 +45,10 @@ primitive = switch prims NoPrimitive
 
 commands :: (MonadIO m, MonadThrow m) => CommandTable m
 commands = Map.fromList
-  [ ("eval", eval)
+  [ ("build", build)
+  , ("eval", eval)
   , ("fmt", fmt)
+  , ("help", help)
   , ("primitive", primitive)
   ]
 
@@ -59,6 +61,10 @@ prims = Map.fromList
 switch :: (MonadIO m, MonadThrow m) => CommandTable m -> (String -> CommandException) -> [String] -> m ()
 switch t e (x : xs) = Map.findWithDefault (const . throwM $ e x) x t xs
 switch t _ []       = liftIO $ mapM_ putStrLn $ Map.keys t
+
+help :: (MonadIO m, MonadThrow m) => [String] -> m ()
+help [] = liftIO $ mapM_ putStrLn $ Map.keys (commands :: CommandTable IO)
+help xs = argMismatch 0 xs
 
 typecheck :: (MonadIO m, MonadThrow m) => [String] -> m ()
 typecheck [i] = readAsm i >>= f
@@ -99,6 +105,14 @@ eval [i] = liftIO $ withFile i ReadMode f
     fromWord32 :: Word32 -> Int
     fromWord32 = fromIntegral
 eval xs = argMismatch 1 xs
+
+build :: (MonadIO m, MonadThrow m) => [String] -> m ()
+build [o, i] = readAsm i >>= f
+  where
+    f p = case program p $ fromProgram p of
+      Just () -> liftIO $ withFile o WriteMode $ flip hPut $ assemble p
+      Nothing -> throwM $ TypeCheckException i
+build xs = argMismatch 2 xs
 
 argMismatch :: MonadThrow m => Int -> [a] -> m ()
 argMismatch n = throwM . ArgNumException n . length
