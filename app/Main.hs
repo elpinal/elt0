@@ -36,8 +36,10 @@ main = getArgs >>= process
 type CommandTable a = Map.Map String ([String] -> a ())
 
 process :: (MonadIO m, MonadThrow m) => [String] -> m ()
-process (x : xs) = Map.findWithDefault (const . throwM $ NoCommand x) x commands xs
-process []       = liftIO $ mapM_ putStrLn $ Map.keys (commands :: CommandTable IO)
+process = switch commands NoCommand
+
+primitive :: (MonadIO m, MonadThrow m) => [String] -> m ()
+primitive = switch prims NoPrimitive
 
 commands :: (MonadIO m, MonadThrow m) => CommandTable m
 commands = Map.fromList
@@ -46,15 +48,15 @@ commands = Map.fromList
   , ("primitive", primitive)
   ]
 
-primitive :: (MonadIO m, MonadThrow m) => [String] -> m ()
-primitive (x : xs) = Map.findWithDefault (const . throwM $ NoPrimitive x) x prims xs
-primitive []       = liftIO $ mapM_ putStrLn $ Map.keys (prims :: CommandTable IO)
-
 prims :: (MonadIO m, MonadThrow m) => CommandTable m
 prims = Map.fromList
   [ ("asm", asm)
   , ("typecheck", typecheck)
   ]
+
+switch :: (MonadIO m, MonadThrow m) => CommandTable m -> (String -> CommandException) -> [String] -> m ()
+switch t e (x : xs) = Map.findWithDefault (const . throwM $ e x) x t xs
+switch t _ []       = liftIO $ mapM_ putStrLn $ Map.keys t
 
 typecheck :: (MonadIO m, MonadThrow m) => [String] -> m ()
 typecheck [i] = readAsm i >>= f
