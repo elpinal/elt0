@@ -1,6 +1,7 @@
 module Main where
 
-import Control.Monad
+import Control.Exception.Safe
+import Control.Monad.IO.Class
 import Data.Array.IO
 import Data.Word
 import System.Environment
@@ -12,62 +13,52 @@ import ELT0.Parser
 import ELT0.Program
 import ELT0.Type
 
+data CommandException
+  = ParseException FilePath Error
+  | ArgNumException Int Int
+  | TypeCheckException FilePath
+  | NoCommand String
+  | NoPrimitive String
+  deriving Show
+
+instance Exception CommandException
+
 main :: IO ()
 main = process
 
-process :: IO ()
-process = getArgs >>= g
+process :: (MonadIO m, MonadThrow m) => m ()
+process = liftIO getArgs >>= f
   where
-    g ("eval" : xs)      = eval xs
-    g ("fmt" : xs)       = f xs
-    g ("primitive" : xs) = primitive xs
-    g (x : _)            = fail $ "no such command: " ++ show x
-    g []                 = fail "no command specified"
+    f ("eval" : xs)      = eval xs
+    f ("fmt" : xs)       = fmt xs
+    f ("primitive" : xs) = primitive xs
+    f (x : _)            = throwM $ NoCommand x
+    f []                 = liftIO $ mapM_ putStrLn ["eval", "fmt", "primitive"]
 
-    f []   = repl
-    f args = mapM_ runFile args
-
-primitive :: [String] -> IO ()
+primitive :: (MonadIO m, MonadThrow m) => [String] -> m ()
 primitive ("asm" : xs)       = asm xs
 primitive ("typecheck" : xs) = typecheck xs
-primitive (x : _)            = fail $ "no such primitive: " ++ show x
-primitive []                 = mapM_ putStrLn ["asm", "typecheck"]
+primitive (x : _)            = throwM $ NoPrimitive x
+primitive []                 = liftIO $ mapM_ putStrLn ["asm", "typecheck"]
 
-repl :: IO ()
-repl = forever $ do
-  prompt
-  stringify . fromString <$> getLine >>= putStr
-
-runFile :: String -> IO ()
-runFile name = stringify . fromString <$> readFile name >>= putStr
-
-prompt :: IO ()
-prompt = do
-  putStr "> "
-  hFlush stdout
-
-stringify :: (Show a, Display b) => Either a b -> String
-stringify (Right p) = display p
-stringify (Left e)  = show e ++ "\n"
-
-typecheck :: [String] -> IO ()
-typecheck [i] = fromString <$> readFile i >>= f
+typecheck :: (MonadIO m, MonadThrow m) => [String] -> m ()
+typecheck [i] = readAsm i >>= f
   where
-    f (Right p) = case program p $ fromProgram p of
-                    Just () -> putStrLn "Successfully typechecked."
-                    Nothing -> putStrLn "Ill-typed program."
-    f (Left e) = hPutStrLn stderr $ show e
+    f p = case program p $ fromProgram p of
+      Just () -> liftIO $ putStrLn "Successfully typechecked."
+      Nothing -> throwM $ TypeCheckException i
 typecheck xs = argMismatch 1 xs
 
-asm :: [String] -> IO ()
-asm [o, i] = fromString <$> readFile i >>= f
-  where
-    f (Right p) = withFile o WriteMode $ flip hPut $ assemble p
-    f (Left e) = hPutStrLn stderr $ show e
+asm :: (MonadIO m, MonadThrow m) => [String] -> m ()
+asm [o, i] = readAsm i >>= liftIO . withFile o WriteMode . flip hPut . assemble
 asm xs = argMismatch 2 xs
 
-eval :: [String] -> IO ()
-eval [i] = withFile i ReadMode f
+fmt :: (MonadIO m, MonadThrow m) => [String] -> m ()
+fmt [name] = readAsm name >>= liftIO . putStr . display
+fmt xs     = argMismatch 1 xs
+
+eval :: (MonadIO m, MonadThrow m) => [String] -> m ()
+eval [i] = liftIO $ withFile i ReadMode f
   where
     f :: Handle -> IO ()
     f hdl = do
@@ -90,5 +81,8 @@ eval [i] = withFile i ReadMode f
     fromWord32 = fromIntegral
 eval xs = argMismatch 1 xs
 
-argMismatch :: Int -> [a] -> IO ()
-argMismatch n xs = fail $ "the number of arguments must be " ++ show n ++ ", but got " ++ show (length xs)
+argMismatch :: MonadThrow m => Int -> [a] -> m ()
+argMismatch n = throwM . ArgNumException n . length
+
+readAsm :: (MonadIO m, MonadThrow m) => FilePath -> m Program
+readAsm p = liftIO (readFile p) >>= either (throwM . ParseException p) return . fromString
