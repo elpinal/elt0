@@ -19,18 +19,18 @@ import ELT0.Type
 data CommandException
   = ParseException FilePath Error
   | ArgNumException Int Int
-  | TypeCheckException FilePath
+  | TypeCheckException FilePath TypeError
   | NoCommand String
   | NoPrimitive String
 
 instance Exception CommandException
 
 instance Show CommandException where
-  show (ParseException p e)   = show p ++ ": parse error: " ++ show e
-  show (ArgNumException e g)  = "the number of arguments must be " ++ show e ++ ", but got " ++ show g
-  show (TypeCheckException p) = "ill-typed: " ++ show p
-  show (NoCommand s)          = "no such command: " ++ show s
-  show (NoPrimitive s)        = "no such primitive: " ++ show s
+  show (ParseException p e)     = show p ++ ": parse error: " ++ show e
+  show (ArgNumException e g)    = "the number of arguments must be " ++ show e ++ ", but got " ++ show g
+  show (TypeCheckException p e) = show p ++ ": type error: " ++ show e
+  show (NoCommand s)            = "no such command: " ++ show s
+  show (NoPrimitive s)          = "no such primitive: " ++ show s
 
 main :: IO ()
 main = getArgs >>= process
@@ -70,8 +70,8 @@ typecheck :: (MonadIO m, MonadThrow m) => [String] -> m ()
 typecheck [i] = readAsm i >>= f
   where
     f p = case program p $ fromProgram p of
-      Just () -> liftIO $ putStrLn "Successfully typechecked."
-      Nothing -> throwM $ TypeCheckException i
+      Right () -> liftIO $ putStrLn "Successfully typechecked."
+      Left e -> throwM $ TypeCheckException i e
 typecheck xs = argMismatch 1 xs
 
 asm :: (MonadIO m, MonadThrow m) => [String] -> m ()
@@ -110,8 +110,8 @@ build :: (MonadIO m, MonadThrow m) => [String] -> m ()
 build [o, i] = readAsm i >>= f
   where
     f p = case program p $ fromProgram p of
-      Just () -> liftIO $ withFile o WriteMode $ flip hPut $ assemble p
-      Nothing -> throwM $ TypeCheckException i
+      Right () -> liftIO $ withFile o WriteMode $ flip hPut $ assemble p
+      Left e -> throwM $ TypeCheckException i e
 build xs = argMismatch 2 xs
 
 argMismatch :: MonadThrow m => Int -> [a] -> m ()

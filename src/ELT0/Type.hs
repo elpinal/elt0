@@ -7,6 +7,9 @@ module ELT0.Type
   , fromProgram
   , Type(..)
   , env
+
+  -- * Errors
+  , TypeError(..)
   ) where
 
 import Control.Monad
@@ -27,14 +30,17 @@ fromProgram (Program bs) = Map.fromList $ map p bs
     p :: Block -> (String, Type)
     p (Block l e _ _) = (l, Code e)
 
-nth :: Word32 -> Stack -> Maybe Type
-nth w s | w < genericLength s = s `genericIndex` w
-nth _ _ | otherwise           = Nothing
+nth :: Word32 -> Stack -> Either TypeError Type
+nth w s | w < genericLength s = maybe (Left $ AccessToNonsense w s) return $ s `genericIndex` w
+nth w s | otherwise           = Left $ ShortStack (w + 1) $ genericLength s
 
-set :: Word32 -> Type -> Stack -> Maybe Stack
-set 0 t (_ : s) = return $ Just t : s
-set w t (h : s) = (h :) <$> set (w - 1) t s
-set _ _ []      = Nothing
+set :: Word32 -> Type -> Stack -> Either TypeError Stack
+set w t s = maybe (Left $ ShortStack (w + 1) $ genericLength s) return $ set' w t s
+
+set' :: Word32 -> Type -> Stack -> Maybe Stack
+set' 0 t (_ : s) = return $ Just t : s
+set' w t (h : s) = (h :) <$> set' (w - 1) t s
+set' _ _ []      = Nothing
 
 mapFile :: (File -> File) -> Env -> Env
 mapFile f e = e { file = f $ file e }
@@ -42,7 +48,21 @@ mapFile f e = e { file = f $ file e }
 mapStack :: (Stack -> Stack) -> Env -> Env
 mapStack f e = e { stack = f $ stack e }
 
-type TypeChecker = ReaderT Heap (StateT Env Maybe)
+type TypeChecker = ReaderT Heap (StateT Env (Either TypeError))
+
+data TypeError
+  = MustInt Type
+  | MustCode Type
+  | MissingHeap String
+  | Mismatch Env Env
+  -- |
+  -- @ShortStack w l@ states that it is not possible to access @w@ slots of the
+  -- stack whose length is @l@.
+  | ShortStack Word32 Word32
+  | AccessToNonsense Word32 Stack
+  | UnboundLabel String
+  | UnboundRegister Reg
+  deriving (Eq, Show)
 
 getFile :: TypeChecker File
 getFile = lift $ gets file
@@ -50,15 +70,18 @@ getFile = lift $ gets file
 getStack :: TypeChecker Stack
 getStack = lift $ gets stack
 
+lookupHeap :: String -> TypeChecker Type
+lookupHeap s = ask >>= maybe (liftEither $ Left $ UnboundLabel s) return . Map.lookup s
+
 class Typed a b where
   typeOf :: a -> TypeChecker b
 
 instance Typed Val Type where
   typeOf (Word _) = return Int
-  typeOf (Label s) = ask >>= liftMaybe . Map.lookup s
+  typeOf (Label s) = lookupHeap s
 
 instance Typed Reg Type where
-  typeOf r = getFile >>= liftMaybe . Map.lookup r
+  typeOf r = getFile >>= maybe (liftEither $ Left $ UnboundRegister r) return . Map.lookup r
 
 instance Typed Operand Type where
   typeOf (Register r) = typeOf r
@@ -70,7 +93,7 @@ instance Typed Numeric Type where
 
 instance Typed Place Type where
   typeOf (PRegister r) = typeOf r
-  typeOf (PLabel s) = ask >>= liftMaybe . Map.lookup s
+  typeOf (PLabel s) = lookupHeap s
 
 instance Typed Inst () where
   typeOf (Mov r o)     = typeOf o >>= insertFile r
@@ -84,10 +107,10 @@ instance Typed Inst () where
   typeOf (If  r p)     = void $ guardInt r >> guardMatch p
   typeOf (Salloc w)    = lift . modify $ mapStack (genericReplicate w Nothing ++)
   typeOf (Sfree w)     = sfree w
-  typeOf (Sld r w)     = getStack >>= liftMaybe . nth w >>= insertFile r
-  typeOf (Sst w o)     = set w <$> typeOf o <*> getStack >>= liftMaybe >>= putStack
+  typeOf (Sld r w)     = getStack >>= liftEither . nth w >>= insertFile r
+  typeOf (Sst w o)     = set w <$> typeOf o <*> getStack >>= liftEither >>= putStack
 
-block :: Block -> ReaderT Heap Maybe ()
+block :: Block -> ReaderT Heap (Either TypeError) ()
 block (Block s _ is mp) = do
   h <- ask
   mapReaderT (g h) $ mapM_ f is >> maybe (return ()) guardMatch mp
@@ -95,11 +118,11 @@ block (Block s _ is mp) = do
     f :: Inst -> TypeChecker ()
     f = typeOf
 
-    g :: Heap -> StateT Env Maybe () -> Maybe ()
-    g h m = Map.lookup s h >>= fromCode >>= evalStateT m
+    g :: Heap -> StateT Env (Either TypeError) () -> Either TypeError ()
+    g h m = maybe (Left $ MissingHeap s) return (Map.lookup s h) >>= fromCode >>= evalStateT m
 
 -- | @program p h@ typechecks @p@ under the assumption @h@.
-program :: Program -> Heap -> Maybe ()
+program :: Program -> Heap -> Either TypeError ()
 program (Program bs) = runReaderT $ mapM_ block bs
 
 intBinOp :: Reg -> Numeric -> Numeric -> TypeChecker ()
@@ -113,32 +136,38 @@ isInt Int = True
 isInt _ = False
 
 guardInt :: Typed a Type => a -> TypeChecker ()
-guardInt n = typeOf n >>= guard . isInt
+guardInt n = typeOf n >>= guardE . MustInt <*> isInt
 
 -- Note: if allowed quantification over 'Code', 'fromCode' should return also polymorphic 'Code'.
-fromCode :: Type -> Maybe Env
+fromCode :: Type -> Either TypeError Env
 fromCode (Code e) = return e
-fromCode Int      = Nothing
+fromCode Int      = Left $ MustCode Int
 
-liftMaybe :: Maybe a -> ReaderT Heap (StateT Env Maybe) a
-liftMaybe = lift . lift
+liftEither :: Either TypeError a -> TypeChecker a
+liftEither = lift . lift
 
 guardMatch :: Place -> TypeChecker ()
-guardMatch p = match <$> (typeOf p >>= liftMaybe . fromCode) <*> lift get >>= guard
+guardMatch p = join $ match <$> (typeOf p >>= liftEither . fromCode) <*> lift get
 
 -- |
 -- @match e1 e2@ tests whether @e1@ matches @e2@.
 -- The term "match" stems from "signature matching" of module systems.
 -- "Signature matching" is described, for example, in
 -- "Advanced Topics in Types and Programming Languages" (Pierce, editor), Chapter 8.
-match :: Env -> Env -> Bool
-match = (==)
+match :: Env -> Env -> TypeChecker ()
+match e1 e2 = if e1 == e2
+  then return ()
+  else liftEither $ Left $ Mismatch e1 e2
 
 sfree :: Word32 -> TypeChecker ()
 sfree w = do
   s <- lift $ gets stack
-  guard $ w <= genericLength s
+  let l = genericLength s
+  guardE (ShortStack w l) $ w <= l
   putStack $ genericDrop w s
 
 putStack :: Stack -> TypeChecker ()
 putStack = lift . modify . mapStack . const
+
+guardE :: TypeError -> Bool -> TypeChecker ()
+guardE e = liftEither . maybe (Left e) return . guard

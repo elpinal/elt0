@@ -17,4 +17,4 @@ spec = do
       Program [block "" [] Nothing]                    `program` Map.singleton "" (Code env) `shouldBe` return ()
       Program [block "" [Reg 1 `Mov` wordO 9] Nothing] `program` Map.singleton "" (Code env) `shouldBe` return ()
 
-      Program [block "" [Reg 1 `Mov` registerO 2] Nothing] `program` Map.singleton "" (Code env) `shouldBe` Nothing
+      Program [block "" [Reg 1 `Mov` registerO 2] Nothing] `program` Map.singleton "" (Code env) `shouldBe` Left (UnboundRegister $ Reg 2)
