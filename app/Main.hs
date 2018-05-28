@@ -31,15 +31,13 @@ instance Show CommandException where
   show (NoPrimitive s)        = "no such primitive: " ++ show s
 
 main :: IO ()
-main = process
+main = getArgs >>= process
 
 type CommandTable a = Map.Map String ([String] -> a ())
 
-process :: (MonadIO m, MonadThrow m) => m ()
-process = liftIO getArgs >>= f
-  where
-    f (x : xs) = Map.findWithDefault (const . throwM $ NoCommand x) x commands xs
-    f []       = liftIO $ mapM_ putStrLn $ Map.keys (commands :: CommandTable IO)
+process :: (MonadIO m, MonadThrow m) => [String] -> m ()
+process (x : xs) = Map.findWithDefault (const . throwM $ NoCommand x) x commands xs
+process []       = liftIO $ mapM_ putStrLn $ Map.keys (commands :: CommandTable IO)
 
 commands :: (MonadIO m, MonadThrow m) => CommandTable m
 commands = Map.fromList
