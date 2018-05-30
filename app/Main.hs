@@ -69,7 +69,7 @@ help xs = argMismatch 0 xs
 typecheck :: (MonadIO m, MonadThrow m) => [String] -> m ()
 typecheck [i] = readAsm i >>= f
   where
-    f p = case program p $ fromProgram p of
+    f p = case fromProgram p >>= program p of
       Right () -> liftIO $ putStrLn "Successfully typechecked."
       Left e -> throwM $ TypeCheckException i e
 typecheck xs = argMismatch 1 xs
@@ -109,7 +109,7 @@ eval xs = argMismatch 1 xs
 build :: (MonadIO m, MonadThrow m) => [String] -> m ()
 build [o, i] = readAsm i >>= f
   where
-    f p = case program p $ fromProgram p of
+    f p = case fromProgram p >>= program p of
       Right () -> liftIO $ withFile o WriteMode $ flip hPut $ assemble p
       Left e -> throwM $ TypeCheckException i e
 build xs = argMismatch 2 xs

@@ -16,6 +16,7 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State
+import Data.Foldable
 import Data.List
 import qualified Data.Map.Lazy as Map
 import Data.Word
@@ -24,11 +25,12 @@ import ELT0.Program
 
 type Heap = Map.Map String Type
 
-fromProgram :: Program -> Heap
-fromProgram (Program bs) = Map.fromList $ map p bs
+fromProgram :: Program -> Either TypeError Heap
+fromProgram (Program bs) = foldrM p Map.empty bs
   where
-    p :: Block -> (String, Type)
-    p (Block l e _ _) = (l, Code e)
+    p :: Block -> Heap -> Either TypeError Heap
+    p (Block l _ _ _) h | l `Map.member` h = Left $ DuplicateLabel l
+    p (Block l e _ _) h = return $ Map.insert l (Code e) h
 
 nth :: Word32 -> Stack -> Either TypeError Type
 nth w s | w < genericLength s = maybe (Left $ AccessToNonsense w s) return $ s `genericIndex` w
@@ -62,6 +64,7 @@ data TypeError
   | AccessToNonsense Word32 Stack
   | UnboundLabel String
   | UnboundRegister Reg
+  | DuplicateLabel String
   deriving (Eq, Show)
 
 getFile :: TypeChecker File
