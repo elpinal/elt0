@@ -1,4 +1,4 @@
-module ELT0.Parser.Lexer
+module Language.ELT0.Parser.Lexer
   (
   -- * Lexers
     Lexer

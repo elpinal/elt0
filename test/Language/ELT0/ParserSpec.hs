@@ -1,8 +1,8 @@
-module ELT0.ParserSpec where
+module Language.ELT0.ParserSpec where
 
 import Test.Hspec
 
-import ELT0.Parser
+import Language.ELT0.Parser
 
 spec :: Spec
 spec = do

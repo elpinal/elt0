@@ -1,12 +1,12 @@
 {-# LANGUAGE BinaryLiterals #-}
 
-module ELT0.EvalSpec where
+module Language.ELT0.EvalSpec where
 
 import Test.Hspec
 
 import qualified Data.Map.Lazy as Map
 
-import ELT0.Eval
+import Language.ELT0.Eval
 
 spec :: Spec
 spec = do

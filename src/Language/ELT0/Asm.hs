@@ -1,4 +1,4 @@
-module ELT0.Asm
+module Language.ELT0.Asm
   ( assemble
   , B.hPut
   , assemble'
@@ -12,7 +12,7 @@ import qualified Data.Map.Lazy as Map
 import Data.Semigroup
 import Data.Word
 
-import ELT0.Program
+import Language.ELT0.Program
 
 assemble :: Program -> B.ByteString
 assemble = B.pack . resolve . assemble'

@@ -1,11 +1,11 @@
-module ELT0.TypeSpec where
+module Language.ELT0.TypeSpec where
 
 import Test.Hspec
 
 import qualified Data.Map.Lazy as Map
 
-import ELT0.Program
-import ELT0.Type
+import Language.ELT0.Program
+import Language.ELT0.Type
 
 spec :: Spec
 spec = do

@@ -1,4 +1,4 @@
-module ELT0.Parser
+module Language.ELT0.Parser
   (
   -- * Minimals
     Minimal(..)
@@ -32,8 +32,8 @@ import qualified Data.Map.Lazy as Map
 import Data.Maybe
 import Data.Word
 
-import ELT0.Parser.Lexer
-import ELT0.Program
+import Language.ELT0.Parser.Lexer
+import Language.ELT0.Program
 
 data Parse1 a
   = Parsed1 a

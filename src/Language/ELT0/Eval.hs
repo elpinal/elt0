@@ -1,6 +1,6 @@
 {-# LANGUAGE BinaryLiterals #-}
 
-module ELT0.Eval
+module Language.ELT0.Eval
   ( run
   , runFile
   , runStack

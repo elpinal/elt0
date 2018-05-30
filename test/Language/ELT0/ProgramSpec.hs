@@ -1,8 +1,8 @@
-module ELT0.ProgramSpec where
+module Language.ELT0.ProgramSpec where
 
 import Test.Hspec
 
-import ELT0.Program
+import Language.ELT0.Program
 
 spec :: Spec
 spec = do

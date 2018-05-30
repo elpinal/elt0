@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-module ELT0.Type
+module Language.ELT0.Type
   ( program
   , Heap
   , fromProgram
@@ -21,7 +21,7 @@ import Data.List
 import qualified Data.Map.Lazy as Map
 import Data.Word
 
-import ELT0.Program
+import Language.ELT0.Program
 
 type Heap = Map.Map String Type
 

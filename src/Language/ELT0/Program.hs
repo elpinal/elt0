@@ -1,4 +1,4 @@
-module ELT0.Program
+module Language.ELT0.Program
   ( Program(..)
   , Block(..)
   , Type(..)

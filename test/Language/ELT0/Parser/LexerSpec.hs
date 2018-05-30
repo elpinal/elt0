@@ -1,10 +1,10 @@
-module ELT0.Parser.LexerSpec where
+module Language.ELT0.Parser.LexerSpec where
 
 import Test.Hspec
 
 import Data.Either
 
-import ELT0.Parser.Lexer
+import Language.ELT0.Parser.Lexer
 
 spec :: Spec
 spec = do

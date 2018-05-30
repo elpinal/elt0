@@ -1,11 +1,11 @@
 {-# LANGUAGE BinaryLiterals #-}
 
-module ELT0.AsmSpec where
+module Language.ELT0.AsmSpec where
 
 import Test.Hspec
 
-import ELT0.Asm
-import ELT0.Program
+import Language.ELT0.Asm
+import Language.ELT0.Program
 
 spec :: Spec
 spec = do
