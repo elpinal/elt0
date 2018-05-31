@@ -199,10 +199,10 @@ comma :: Minimal ()
 comma = token Comma "comma"
 
 int :: Minimal ()
-int = token IntType $ show "int"
+int = token IntType $ show "Int"
 
 code :: Minimal ()
-code = token CodeType $ show "code"
+code = token CodeType $ show "Code"
 
 typeM :: Minimal (Parser Type)
 typeM = int $> return Int -|- code $> (Code <$> parseEnv)
@@ -274,7 +274,7 @@ slotM :: Minimal (Parser (Maybe Type))
 slotM = fmap Just <$> typeM -|- ns $> return Nothing
 
 ns :: Minimal ()
-ns = token NS "ns"
+ns = token NS $ show "NS"
 
 (^>) :: Monad m => m (Maybe a) -> m b -> m (Maybe b)
 x ^> y = x >>= maybe (return Nothing) (const $ Just <$> y)
