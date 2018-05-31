@@ -26,9 +26,9 @@ data CommandException
 instance Exception CommandException
 
 instance Show CommandException where
-  show (ParseException p e)     = show p ++ ": parse error: " ++ show e
+  show (ParseException p e)     = show p ++ ": parse error: " ++ display e
   show (ArgNumException e g)    = "the number of arguments must be " ++ show e ++ ", but got " ++ show g
-  show (TypeCheckException p e) = show p ++ ": type error: " ++ show e
+  show (TypeCheckException p e) = show p ++ ": type error: " ++ display e
   show (NoCommand s)            = "no such command: " ++ show s
   show (NoPrimitive s)          = "no such primitive: " ++ show s
 

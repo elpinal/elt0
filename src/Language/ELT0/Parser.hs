@@ -28,8 +28,10 @@ module Language.ELT0.Parser
 import Control.Applicative
 import Data.Bifunctor
 import Data.Functor
+import Data.List
 import qualified Data.Map.Lazy as Map
 import Data.Maybe
+import Data.Monoid
 import Data.Word
 
 import Language.ELT0.Parser.Lexer
@@ -345,15 +347,23 @@ program = Program <$> p
 
 data Error
   = Unexpected (Maybe TokenP) [String]
-  | Trailing [TokenP]
+  | Trailing TokenP
   | Lexer LexError
   deriving (Eq, Show)
+
+instance Display Error where
+  displayS (Unexpected mt es) = showString "expected one of [" . e . showString "], but " . g
+    where
+      e = appEndo . foldMap Endo . intersperse (showString ", ") . map showString $ es
+      g = maybe (showString "reached the end of input") (\t -> showString "got " . shows t) mt
+  displayS (Trailing t) = shows t
+  displayS (Lexer e) = shows e
 
 parse :: [TokenP] -> Either Error Program
 parse i = case runParser program i of
   (Parsed p, xs) -> case xs of
     [] -> return p
-    _ -> Left $ Trailing xs
+    (t : _) -> Left $ Trailing t
   (Fail m e, _) -> Left $ Unexpected m e
 
 -- | Parses a program from 'String'.

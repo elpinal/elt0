@@ -67,6 +67,17 @@ data TypeError
   | DuplicateLabel String
   deriving (Eq, Show)
 
+instance Display TypeError where
+  displayS (MustInt t)            = showString "expected Int, but got " . displayS t
+  displayS (MustCode t)           = showString "expected Code, but got " . displayS t
+  displayS (MissingHeap s)        = showString "heap for " . showString s . showString " is not given" -- rare case
+  displayS (Mismatch d s)         = showString "could not jump to " . displayS d . showString " from " . displayS s
+  displayS (ShortStack w l)       = showString "stack is required to have at least " . shows w . showString " slots, but indeed its length is " . shows l
+  displayS (AccessToNonsense w s) = showString "access to nonsense: " . shows w . showString " of " . shows s
+  displayS (UnboundLabel s)       = showString "unbound label: " . shows s
+  displayS (UnboundRegister r)    = showString "unbound register: " . displayS r
+  displayS (DuplicateLabel s)     = showString "duplicate label declaration: " . shows s
+
 getFile :: TypeChecker File
 getFile = lift $ gets file
 
