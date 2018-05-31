@@ -10,4 +10,4 @@ spec = do
     it "displays a data" $ do
       let i = Reg 0 `Mov` wordO 123
       display i                           `shouldBe` "mov R0 123"
-      display (Block "x" env [i] Nothing) `shouldBe` "x:\nmov R0 123\nhalt"
+      display (Block "x" env [i] Nothing) `shouldBe` "x Code:\nmov R0 123\nhalt"

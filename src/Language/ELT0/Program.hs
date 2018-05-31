@@ -154,11 +154,11 @@ displayBrack :: ShowS -> ShowS
 displayBrack s = showChar '[' . s . showChar ']'
 
 instance Display Type where
-  displayS Int = showString "int"
+  displayS Int = showString "Int"
   displayS (Code e) = displayS e
 
 instance Display Env where
-  displayS e = f (file e) . s (stack e)
+  displayS e = showString "Code" . f (file e) . s (stack e)
     where
       f i = if i == mempty then id else displayBrace $ j $ map pair $ Map.assocs i
       s i = if i == mempty then id else displayBrack $ j $ map slot i
@@ -170,7 +170,7 @@ instance Display Env where
       slot (Just t) = displayS t
 
 instance Display Block where
-  displayS (Block l e is m) = showString l . displayS e . showString ":\n" .  x . end m
+  displayS (Block l e is m) = showString l . showChar ' ' . displayS e . showString ":\n" .  x . end m
     where
       x = foldr (\i s -> displayS i . showChar '\n' . s) id is
       end (Just p) = showString "jmp " . displayS p
