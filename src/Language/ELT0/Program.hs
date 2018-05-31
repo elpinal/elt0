@@ -161,17 +161,20 @@ instance Display Type where
   displayS Int = showString "Int"
   displayS (Code e) = displayS e
 
+instance Display a => Display (Slot a) where
+  -- "NS" stands for nonsense; see [Stack-Based Typed Assembly Language] (1998) by Morrisett et al.
+  displayS s = case runSlot s of
+    Nothing -> showString "NS"
+    Just x -> displayS x
+
 instance Display Env where
   displayS e = showString "Code" . f (file e) . s (stack e)
     where
       f i = if i == mempty then id else displayBrace $ j $ map pair $ Map.assocs i
-      s i = if i == mempty then id else displayBrack $ j $ map (slot . runSlot) i
+      s i = if i == mempty then id else displayBrack $ j $ map displayS i
 
       j = foldr (.) id . intersperse (showString ", ")
       pair (r, t) = displayS r . showString ": " . displayS t
-      -- "ns" stands for nonsense; see [Stack-Based Typed Assembly Language] (1998) by Morrisett et al.
-      slot Nothing = showString "ns"
-      slot (Just t) = displayS t
 
 instance Display Block where
   displayS (Block l e is m) = showString l . showChar ' ' . displayS e . showString ":\n" .  x . end m
