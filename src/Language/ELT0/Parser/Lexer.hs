@@ -23,7 +23,6 @@ module Language.ELT0.Parser.Lexer
   , Stream
   ) where
 
-import Control.Applicative
 import Control.Arrow
 import Control.Monad
 import Control.Monad.Trans.Class
@@ -74,11 +73,6 @@ data Token
   | NS -- ^ nonsense
   deriving (Eq, Show)
 
-data Error
-  = LexError LexError
-  | ParseError ParseError
-  deriving (Eq, Show)
-
 -- | Errors produced by 'Lexer'.
 data LexError
   = ZeroStartDigits Position
@@ -90,11 +84,6 @@ data LexError
   | FollowedByAlpha String Position
   | InvalidReg String Position
   | OverflowImm32 Integer Position
-  deriving (Eq, Show)
-
-data ParseError
-  = Expect TokenKind (Maybe TokenP)
-  | ExpectToken Token (Maybe TokenP)
   deriving (Eq, Show)
 
 data TokenKind
@@ -172,34 +161,6 @@ while :: (Char -> Bool) -> Stream String
 while f = satisfy f >>= maybe (return []) (\x -> (x :) <$> while f)
 
 type Lexer = ExceptT LexError Stream
-
-newtype Parser a = Parser { runParser :: [TokenP] -> Either ParseError (Maybe (a, [TokenP])) }
-
-instance Functor Parser where
-  fmap f (Parser p) = Parser p'
-    where
-      p' ts = fmap (first f) <$> p ts
-
-instance Applicative Parser where
-  pure x = Parser $ \ts -> Right $ Just (x, ts)
-  liftA2 f (Parser p1) (Parser p2) = Parser p
-    where
-      p ts = p1 ts >>= maybe (Right Nothing) g
-      g (x, ts) = p2 ts >>= maybe (Right Nothing) (h x)
-      h x (y, ts) = Right $ Just (f x y, ts)
-
-instance Monad Parser where
-  (Parser p) >>= f = Parser p'
-    where
-      p' ts = p ts >>= maybe (Right Nothing) g
-      -- g :: (a, c) -> Either e (Maybe (Parser b, c))
-      g = app . first (runParser . f)
-
-instance Alternative Parser where
-  empty = Parser $ const $ Right Nothing
-  (Parser p1) <|> (Parser p2) = Parser p
-    where
-      p ts = p1 ts >>= maybe (p2 ts) (Right . Just)
 
 -- | Tokenizes a token. It returns Nothing when no input is available.
 lex1 :: Lexer (Maybe TokenP)
