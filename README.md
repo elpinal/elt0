@@ -2,7 +2,11 @@
 
 ELT0 is a general-purpose typed assembly language.
 
-See [doc/definition.pdf](https://github.com/elpinal/elt0/blob/master/doc/definition.pdf), though it is outdated.
+## Resources
+
+- [Guide to understand the syntax of ELT0](https://github.com/elpinal/elt0/wiki/Syntax)
+- [Roadmap](https://github.com/elpinal/elt0/issues/1)
+- [Formal definition](https://github.com/elpinal/elt0/blob/master/doc/definition.pdf) (outdated)
 
 ## Install
 
