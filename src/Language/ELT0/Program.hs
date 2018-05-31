@@ -6,6 +6,7 @@ module Language.ELT0.Program
   , env
   , File
   , Stack
+  , Slot(..)
   , Inst(..)
   , Reg(..)
   , Operand(..)
@@ -100,7 +101,10 @@ env = Env
 
 type File = Map.Map Reg Type
 
-type Stack = [Maybe Type]
+type Stack = [Slot Type]
+
+newtype Slot a = Slot { runSlot :: Maybe a }
+  deriving (Eq, Show)
 
 class Display a where
   displayS :: a -> ShowS
@@ -161,7 +165,7 @@ instance Display Env where
   displayS e = showString "Code" . f (file e) . s (stack e)
     where
       f i = if i == mempty then id else displayBrace $ j $ map pair $ Map.assocs i
-      s i = if i == mempty then id else displayBrack $ j $ map slot i
+      s i = if i == mempty then id else displayBrack $ j $ map (slot . runSlot) i
 
       j = foldr (.) id . intersperse (showString ", ")
       pair (r, t) = displayS r . showString ": " . displayS t

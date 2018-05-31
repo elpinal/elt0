@@ -258,20 +258,20 @@ parseStack = (slot1 >>= p) <* fromMinimal rBrack
         Just () -> (:) <$> slot <*> slots
         Nothing -> return []
 
-slot1 :: Parser (Maybe (Maybe Type))
+slot1 :: Parser (Maybe (Slot Type))
 slot1 = do
   ma <- option slotM
   case ma of
     Nothing -> return Nothing
     Just a -> Just <$> a
 
-slot :: Parser (Maybe Type)
+slot :: Parser (Slot Type)
 slot = do
   a <- fromMinimal slotM
   a
 
-slotM :: Minimal (Parser (Maybe Type))
-slotM = fmap Just <$> typeM -|- ns $> return Nothing
+slotM :: Minimal (Parser (Slot Type))
+slotM = fmap (Slot . Just) <$> typeM -|- ns $> return (Slot Nothing)
 
 ns :: Minimal ()
 ns = token NS $ show "NS"

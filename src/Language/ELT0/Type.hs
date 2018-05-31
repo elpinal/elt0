@@ -33,14 +33,14 @@ fromProgram (Program bs) = foldrM p Map.empty bs
     p (Block l e _ _) h = return $ Map.insert l (Code e) h
 
 nth :: Word32 -> Stack -> Either TypeError Type
-nth w s | w < genericLength s = maybe (Left $ AccessToNonsense w s) return $ s `genericIndex` w
+nth w s | w < genericLength s = maybe (Left $ AccessToNonsense w s) return . runSlot $ s `genericIndex` w
 nth w s | otherwise           = Left $ ShortStack (w + 1) $ genericLength s
 
 set :: Word32 -> Type -> Stack -> Either TypeError Stack
 set w t s = maybe (Left $ ShortStack (w + 1) $ genericLength s) return $ set' w t s
 
 set' :: Word32 -> Type -> Stack -> Maybe Stack
-set' 0 t (_ : s) = return $ Just t : s
+set' 0 t (_ : s) = return $ Slot (Just t) : s
 set' w t (h : s) = (h :) <$> set' (w - 1) t s
 set' _ _ []      = Nothing
 
@@ -119,7 +119,7 @@ instance Typed Inst () where
   typeOf (Shl r n1 n2) = intBinOp r n1 n2
   typeOf (Shr r n1 n2) = intBinOp r n1 n2
   typeOf (If  r p)     = void $ guardInt r >> guardMatch p
-  typeOf (Salloc w)    = lift . modify $ mapStack (genericReplicate w Nothing ++)
+  typeOf (Salloc w)    = lift . modify $ mapStack (genericReplicate w (Slot Nothing) ++)
   typeOf (Sfree w)     = sfree w
   typeOf (Sld r w)     = getStack >>= liftEither . nth w >>= insertFile r
   typeOf (Sst w o)     = set w <$> typeOf o <*> getStack >>= liftEither >>= putStack
