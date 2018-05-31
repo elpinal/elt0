@@ -177,7 +177,7 @@ instance Display Block where
       end Nothing = showString "halt"
 
 instance Display Program where
-  displayS (Program bs) = foldr (\b s -> displayS b . showString "\n\n" . s) id bs
+  displayS (Program bs) = foldr (.) id . intersperse (showString "\n\n") $ map displayS bs
 
 wordO :: Word32 -> Operand
 wordO = Value . Word . W

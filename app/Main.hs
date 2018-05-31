@@ -79,7 +79,7 @@ asm [o, i] = readAsm i >>= liftIO . withFile o WriteMode . flip hPut . assemble
 asm xs = argMismatch 2 xs
 
 fmt :: (MonadIO m, MonadThrow m) => [String] -> m ()
-fmt [name] = readAsm name >>= liftIO . putStr . display
+fmt [name] = readAsm name >>= liftIO . putStrLn . display
 fmt xs     = argMismatch 1 xs
 
 eval :: (MonadIO m, MonadThrow m) => [String] -> m ()
