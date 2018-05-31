@@ -70,8 +70,8 @@ data Token
   | RBrack -- ^ a right brack
   | Comma
   | IntType -- ^ an int type
-  | NS -- ^ nonsense
   | CodeType
+  | NS -- ^ nonsense
   deriving (Eq, Show)
 
 data Error
@@ -265,6 +265,7 @@ lexLetters p ('R' : ds) | let l = length ds, 0 < l, all isDigit ds =
       f w = return . at p $ RegToken . fromInteger $ toInteger w
 lexLetters p "Int" = return (IntType, p)
 lexLetters p "Code" = return (CodeType, p)
+lexLetters p "NS" = return (NS, p)
 lexLetters p a @ (x : _) | isAsciiUpper x = throwE $ UpperNonReg a p
 lexLetters p a = return (f a, p)
   where
