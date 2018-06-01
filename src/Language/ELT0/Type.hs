@@ -56,6 +56,8 @@ data TypeError
   = MustInt Type
   | MustCode Type
   | MissingHeap String
+  -- |
+  -- @Mismatch e1 e2@ denotes @e1@ does not match @e2@.
   | Mismatch Env Env
   -- |
   -- @ShortStack w l@ states that it is not possible to access @w@ slots of the
@@ -71,7 +73,7 @@ instance Display TypeError where
   displayS (MustInt t)            = showString "expected Int, but got " . displayS t
   displayS (MustCode t)           = showString "expected Code, but got " . displayS t
   displayS (MissingHeap s)        = showString "heap for " . showString s . showString " is not given" -- rare case
-  displayS (Mismatch d s)         = showString "could not jump to " . displayS d . showString " from " . displayS s
+  displayS (Mismatch e1 e2)       = displayS e1 . showString " does not match " . displayS e2
   displayS (ShortStack w l)       = showString "stack is required to have at least " . shows w . showString " slots, but indeed its length is " . shows l
   displayS (AccessToNonsense w s) = showString "access to nonsense: " . shows w . showString " of " . shows s
   displayS (UnboundLabel s)       = showString "unbound label: " . shows s
@@ -161,7 +163,7 @@ liftEither :: Either TypeError a -> TypeChecker a
 liftEither = lift . lift
 
 guardMatch :: Place -> TypeChecker ()
-guardMatch p = join $ match <$> (typeOf p >>= liftEither . fromCode) <*> lift get
+guardMatch p = join $ match <$> lift get <*> (typeOf p >>= liftEither . fromCode)
 
 -- |
 -- @match e1 e2@ tests whether @e1@ matches @e2@.
@@ -169,7 +171,7 @@ guardMatch p = join $ match <$> (typeOf p >>= liftEither . fromCode) <*> lift ge
 -- "Signature matching" is described, for example, in
 -- "Advanced Topics in Types and Programming Languages" (Pierce, editor), Chapter 8.
 match :: Env -> Env -> TypeChecker ()
-match e1 e2 = if e1 == e2
+match e1 e2 = if e1 <: e2
   then return ()
   else liftEither $ Left $ Mismatch e1 e2
 
@@ -185,3 +187,13 @@ putStack = lift . modify . mapStack . const
 
 guardE :: TypeError -> Bool -> TypeChecker ()
 guardE e = liftEither . maybe (Left e) return . guard
+
+class Subtyping a where
+  (<:) :: a -> a -> Bool
+
+instance Subtyping Env where
+  e1 <: e2 = stack e1 == stack e2 && file e1 <: file e2
+
+instance Subtyping File where
+  -- | Width subtyping for records.
+  f1 <: f2 = Map.isSubmapOf f2 f1
