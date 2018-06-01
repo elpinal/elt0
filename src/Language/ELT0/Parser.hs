@@ -281,7 +281,6 @@ x ^> y = x >>= maybe (return Nothing) (const $ Just <$> y)
 
 parseEnv :: Parser Env
 parseEnv = do
-  fromMinimal code
   mf <- option lBrace ^> parseFile
   ms <- option lBrack ^> parseStack
   return $ Env
@@ -332,6 +331,7 @@ block = do
   case ms of
     Nothing -> return Nothing
     Just s -> do
+      fromMinimal code
       e <- parseEnv
       fromMinimal colon
       is <- p
