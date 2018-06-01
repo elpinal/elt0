@@ -42,8 +42,6 @@ sub R1 R1 1
 jmp loop
 
 done Code{
-        R1: Int,
-        R2: Int,
         R3: Int
 }:
 halt
