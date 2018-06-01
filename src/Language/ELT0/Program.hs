@@ -87,7 +87,8 @@ data Type
   deriving (Eq, Show)
 
 data Env = Env
-  { file :: File
+  { binding :: [String]
+  , file :: File
   , stack :: Stack
   }
   deriving (Eq, Show)
@@ -95,7 +96,8 @@ data Env = Env
 -- | An empty 'Env'.
 env :: Env
 env = Env
-  { file = mempty
+  { binding = mempty
+  , file = mempty
   , stack = mempty
   }
 
@@ -168,13 +170,17 @@ instance Display a => Display (Slot a) where
     Just x -> displayS x
 
 instance Display Env where
-  displayS e = showString "Code" . f (file e) . s (stack e)
+  displayS e = showString "Code" . b (binding e) . f (file e) . s (stack e)
     where
       f i = if i == mempty then id else displayBrace $ j $ map pair $ Map.assocs i
       s i = if i == mempty then id else displayBrack $ j $ map displayS i
 
       j = foldr (.) id . intersperse (showString ", ")
       pair (r, t) = displayS r . showString ": " . displayS t
+
+      b :: [String] -> String -> String
+      b [] = id
+      b (x : xs) = showString " " . showString x . b xs
 
 instance Display Block where
   displayS (Block l e is m) = showString l . showChar ' ' . displayS e . showString ":\n" .  x . end m

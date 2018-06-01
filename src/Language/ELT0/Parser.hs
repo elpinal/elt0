@@ -276,15 +276,26 @@ slotM = fmap (Slot . Just) <$> typeM -|- ns $> return (Slot Nothing)
 ns :: Minimal ()
 ns = token NS $ show "NS"
 
+typeAssignment :: Parser [String]
+typeAssignment = option tyVar >>= maybe (return []) ((<$> typeAssignment) . (:))
+
+tyVar :: Minimal String
+tyVar = minimal f ["type variable"]
+  where
+    f (Ident s) = return s
+    f _ = Nothing
+
 (^>) :: Monad m => m (Maybe a) -> m b -> m (Maybe b)
 x ^> y = x >>= maybe (return Nothing) (const $ Just <$> y)
 
 parseEnv :: Parser Env
 parseEnv = do
+  xs <- typeAssignment
   mf <- option lBrace ^> parseFile
   ms <- option lBrack ^> parseStack
   return $ Env
-    { file = fromMaybe mempty mf
+    { binding = xs
+    , file = fromMaybe mempty mf
     , stack = fromMaybe mempty ms
     }
 
