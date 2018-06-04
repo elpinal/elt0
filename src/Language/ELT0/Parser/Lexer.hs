@@ -61,7 +61,6 @@ data Token
   | Jmp -- ^ a `jmp` mnemonic
   | Halt -- ^ a `halt` mnemonic
   | Digits Word32 -- ^ a word
-  | MaxNum -- ^ @ 2^32 @
   | RegToken Word8 -- ^ a register
   | Colon
   | LBrace -- ^ a left brace
@@ -198,7 +197,6 @@ lexWord p x = do
 -- Precondition: @n >= 0@ must hold.
 validImm32 :: Position -> Integer -> Lexer Token
 validImm32 p n | n > 1 + toInteger (maxBound :: Word32) = throwE $ OverflowImm32 n p
-validImm32 _ n | n == 1 + toInteger (maxBound :: Word32) = return $ MaxNum
 validImm32 _ n = return $ Digits $ fromInteger n
 
 notFollowedByLetter :: Stream Bool
