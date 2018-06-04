@@ -13,7 +13,7 @@ module Language.ELT0.Eval
   , Machine(..)
   ) where
 
-import Control.Arrow hiding (loop)
+import Control.Arrow
 import Control.Applicative
 import Control.Monad
 import Control.Monad.ST
@@ -87,7 +87,7 @@ data Machine s = Machine
 vector :: ST s (Vector s)
 vector = do
   a <- newArray_ (1, 0)
-  return $ Vector
+  return Vector
     { content = a
     , cap = 0
     , len = 0
@@ -174,7 +174,7 @@ runS c xs = runST $ do
   v <- runStack . stack <$> runMachine Machine
     { text = c
     , file = mempty
-    , stack = Stack $ Vector { content = inv, cap = l, len = l }
+    , stack = Stack Vector { content = inv, cap = l, len = l }
     }
   a <- unsafeFreeze $ content v
   return $ genericTake (len v) $ elems (a :: UArray Integer Word32)
@@ -186,10 +186,10 @@ runFS :: Code -> File -> [Word32] -> (File, [Word32])
 runFS c f xs = runST $ do
   let l = genericLength xs
   inv <- thaw (listArray (1, l) xs :: UArray Integer Word32)
-  m <- runMachine $ Machine
+  m <- runMachine Machine
     { text = c
     , file = f
-    , stack = Stack $ Vector { content = inv, cap = l, len = l }
+    , stack = Stack Vector { content = inv, cap = l, len = l }
     }
   a <- unsafeFreeze $ content $ runStack $ stack m
   return (file m, genericTake (len $ runStack $ stack m) $ elems (a :: UArray Integer Word32))
