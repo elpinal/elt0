@@ -319,11 +319,15 @@ pushWord w = lift . modify . mapStack $ (w :)
 
 -- "Stack allocation" instruction.
 -- Allocated slots are uninitialized. In fact, they are set to zero.
+-- If the operand is equal to 0, it is interpreted as 4294967296, which is equals to 2^32.
 -- Format:
 -- | 5 bits (11 in decimal) | 3 bits (ignored) | 32 bits
 salloc :: Evaluator ()
-salloc = inc >> fetchWord >>= loop
+salloc = inc >> fetchWord >>= zero
   where
+    zero 0 = replicateM_ 32 $ pushWord 0
+    zero cnt = loop cnt
+
     loop cnt
       | cnt == 0 = pure ()
       | otherwise = pushWord 0 *> loop (cnt - 1)
@@ -332,11 +336,15 @@ dropWord :: Evaluator ()
 dropWord = lift . modify $ mapStack $ \(_ : xs) -> xs
 
 -- "Stack free" instruction.
+-- If the operand is equal to 0, it is interpreted as 4294967296, which is equals to 2^32.
 -- Format:
 -- | 5 bits (12 in decimal) | 3 bits (ignored) | 32 bits
 sfree :: Evaluator ()
-sfree = inc >> fetchWord >>= loop
+sfree = inc >> fetchWord >>= zero
   where
+    zero 0 = replicateM_ 32 dropWord
+    zero cnt = loop cnt
+
     loop cnt
       | cnt == 0 = pure ()
       | otherwise = dropWord *> loop (cnt - 1)

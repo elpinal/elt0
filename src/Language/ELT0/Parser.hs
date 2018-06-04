@@ -180,6 +180,15 @@ word' = minimal f ["word"]
 word :: Minimal W
 word = W <$> word'
 
+liftedWord :: Minimal Word32
+liftedWord = minimal f ["lifted word"]
+  where
+    f (Digits w)
+      | w /= 0 = return w
+      | w == 0 = Nothing
+    f MaxNum = return 0
+    f _ = Nothing
+
 value :: Minimal Val
 value = Word <$> word -|- Label <$> label
 
@@ -311,8 +320,8 @@ inst = do
     , f TShl "shl" $> rnn Shl
     , f TShr "shr" $> rnn Shr
     , f TIf  "if"  $> (If <$> fromMinimal register <*> fromMinimal place)
-    , f TSalloc "salloc" $> (Salloc <$> fromMinimal word')
-    , f TSfree  "sfree"  $> (Sfree <$> fromMinimal word')
+    , f TSalloc "salloc" $> (Salloc <$> fromMinimal liftedWord)
+    , f TSfree  "sfree"  $> (Sfree <$> fromMinimal liftedWord)
     , f TSld "sld" $> (Sld <$> fromMinimal register <*> fromMinimal word')
     , f TSst "sst" $> (Sst <$> fromMinimal word' <*> fromMinimal operand)
     ]

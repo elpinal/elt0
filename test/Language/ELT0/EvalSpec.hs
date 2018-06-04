@@ -73,8 +73,8 @@ spec = do
       runStack (code [11, 0, 0, 0, 2, 11, 0, 0, 0, 5, 10]) [] `shouldBe` replicate 7 0
 
       -- "sfree"
-      runStack (code [12, 0, 0, 0, 0, 10]) []                            `shouldBe` []
-      runStack (code [12, 0, 0, 0, 0, 10]) [5]                           `shouldBe` [5]
+      --runStack (code [12, 0, 0, 0, 0, 10]) (replicate (2^32) 0)          `shouldBe` []
+      --runStack (code [12, 0, 0, 0, 0, 10]) (replicate (2^32 + 1) 5)      `shouldBe` [5]
       runStack (code [12, 0, 0, 0, 1, 10]) [12]                          `shouldBe` []
       runStack (code [12, 0, 0, 0, 4, 10]) [12, 1, 3, 18, 8031, 23, 922] `shouldBe` [8031, 23, 922]
 
