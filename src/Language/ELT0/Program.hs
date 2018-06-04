@@ -65,10 +65,10 @@ data Inst
   | Shl Reg Numeric Numeric
   | Shr Reg Numeric Numeric
   | If  Reg Place
-  | Salloc Word32
-  | Sfree  Word32
-  | Sld    Reg Word32
-  | Sst    Word32 Operand -- Allow labels to be used with the "sst" instruction.
+  | Salloc Word8 -- 1 to 8
+  | Sfree  Word8 -- 1 to 8
+  | Sld    Reg Word8
+  | Sst    Word8 Operand -- Allow labels to be used with the "sst" instruction.
   deriving (Eq, Show)
 
 newtype Program = Program [Block]

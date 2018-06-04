@@ -1,3 +1,5 @@
+{-# LANGUAGE BinaryLiterals #-}
+
 module Language.ELT0.Asm
   ( assemble
   , B.hPut
@@ -68,7 +70,7 @@ opfs x b = b .|. setIfValue x 5
 inst :: Inst -> Recorder
 inst (Mov r o) = word8 (opfs o 0) <> reg r |- operand o
 inst (If r p)  = word8 (opfs p 8) <> reg r |- place p
-inst (Sst w o) = word8 (opfs o 14) <> word32BE w |- operand o
+inst (Sst w o) = word8 (opfs o 14) <> word8 w |- operand o
 inst i = fromBuilder $ inst' i
 
 inst' :: Inst -> Builder
@@ -79,9 +81,9 @@ inst' (Or  r n1 n2) = rnn 4 r n1 n2
 inst' (Not r n)     = rn 5 r n
 inst' (Shl r n1 n2) = rnn 6 r n1 n2
 inst' (Shr r n1 n2) = rnn 7 r n1 n2
-inst' (Salloc w)    = word8 11 <> word32BE w
-inst' (Sfree  w)    = word8 12 <> word32BE w
-inst' (Sld  r w)    = word8 13 <> reg r <> word32BE w
+inst' (Salloc w)    = word8 $ 11 .|. shiftL (w .&. 0b111) 5
+inst' (Sfree  w)    = word8 $ 12 .|. shiftL (w .&. 0b111) 5
+inst' (Sld  r w)    = word8 13 <> reg r <> word8 w
 inst' _ = error "unreachable"
 
 rnn :: Word8 -> Reg -> Numeric -> Numeric -> Builder
