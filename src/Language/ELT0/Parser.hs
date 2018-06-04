@@ -189,6 +189,14 @@ liftedWord = minimal f ["lifted word"]
     f MaxNum = return 0
     f _ = Nothing
 
+word8 :: Minimal Word8
+word8 = minimal f ["8-bit integer"]
+  where
+    f (Digits w)
+      | w <= fromIntegral (maxBound :: Word8) = return $ fromIntegral w
+      | otherwise = Nothing
+    f _ = Nothing
+
 value :: Minimal Val
 value = Word <$> word -|- Label <$> label
 
@@ -322,8 +330,8 @@ inst = do
     , f TIf  "if"  $> (If <$> fromMinimal register <*> fromMinimal place)
     , f TSalloc "salloc" $> (Salloc <$> fromMinimal liftedWord)
     , f TSfree  "sfree"  $> (Sfree <$> fromMinimal liftedWord)
-    , f TSld "sld" $> (Sld <$> fromMinimal register <*> fromMinimal word')
-    , f TSst "sst" $> (Sst <$> fromMinimal word' <*> fromMinimal operand)
+    , f TSld "sld" $> (Sld <$> fromMinimal register <*> fromMinimal word8)
+    , f TSst "sst" $> (Sst <$> fromMinimal word8 <*> fromMinimal operand)
     ]
   maybe (return Nothing) (fmap Just) ma
   where

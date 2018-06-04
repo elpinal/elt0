@@ -32,14 +32,17 @@ fromProgram (Program bs) = foldrM p Map.empty bs
     p (Block l _ _ _) h | l `Map.member` h = Left $ DuplicateLabel l
     p (Block l e _ _) h = return $ Map.insert l (Code e) h
 
-nth :: Word32 -> Stack -> Either TypeError Type
-nth w s | w < genericLength s = maybe (Left $ AccessToNonsense w s) return . runSlot $ s `genericIndex` w
-nth w s | otherwise           = Left $ ShortStack (w + 1) $ genericLength s
+nth :: Word8 -> Stack -> Either TypeError Type
+nth w s | fromIntegral w < len32 s = maybe (Left $ AccessToNonsense w s) return . runSlot $ s `genericIndex` w
+  where
+    len32 :: Stack -> Word32
+    len32 = genericLength
+nth w s = Left $ ShortStack (fromIntegral w + 1) $ genericLength s
 
-set :: Word32 -> Type -> Stack -> Either TypeError Stack
-set w t s = maybe (Left $ ShortStack (w + 1) $ genericLength s) return $ set' w t s
+set :: Word8 -> Type -> Stack -> Either TypeError Stack
+set w t s = maybe (Left $ ShortStack (fromIntegral w + 1) $ genericLength s) return $ set' w t s
 
-set' :: Word32 -> Type -> Stack -> Maybe Stack
+set' :: Word8 -> Type -> Stack -> Maybe Stack
 set' 0 t (_ : s) = return $ Slot (Just t) : s
 set' w t (h : s) = (h :) <$> set' (w - 1) t s
 set' _ _ []      = Nothing
@@ -63,7 +66,7 @@ data TypeError
   -- @ShortStack w l@ states that it is not possible to access @w@ slots of the
   -- stack whose length is @l@.
   | ShortStack Word32 Word32
-  | AccessToNonsense Word32 Stack
+  | AccessToNonsense Word8 Stack
   | UnboundLabel String
   | UnboundRegister Reg
   | DuplicateLabel String

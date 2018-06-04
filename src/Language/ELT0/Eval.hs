@@ -86,10 +86,10 @@ mapFile f (Machine c rf s) = Machine c (f rf) s
 mapStack :: (Stack -> Stack) -> Machine -> Machine
 mapStack f (Machine c rf s) = Machine c rf $ f s
 
-accessStack :: Word32 -> Stack -> Word32
+accessStack :: Word8 -> Stack -> Word32
 accessStack w s = s `genericIndex` w
 
-insertStack :: Word32 -> Word32 -> Stack -> Stack
+insertStack :: Word8 -> Word32 -> Stack -> Stack
 insertStack 0 w (_ : s) = w : s
 insertStack i w (h : s) = h : insertStack (i - 1) w s
 insertStack _ _ [] = error "get stuck: empty stack"
@@ -176,7 +176,7 @@ instruction = readMask 0b11111 >>= f
 modifyReg :: Word8 -> Word32 -> Evaluator ()
 modifyReg r v = lift $ modify $ mapFile $ Map.insert r v
 
-modifyStack :: Word32 -> Word32 -> Evaluator ()
+modifyStack :: Word8 -> Word32 -> Evaluator ()
 modifyStack i w = lift $ modify $ mapStack $ insertStack i w
 
 getVal :: Word8 -> Evaluator Word32
@@ -349,23 +349,23 @@ sfree = inc >> fetchWord >>= zero
       | cnt == 0 = pure ()
       | otherwise = dropWord *> loop (cnt - 1)
 
-getFromStack :: Word32 -> Evaluator Word32
+getFromStack :: Word8 -> Evaluator Word32
 getFromStack w = lift . gets $ accessStack w . getStack
 
 -- "Stack load" instruction.
 -- Load a word from the nth slot of the stack into a register.
 -- The index starts from 0; the 0th slot is the top of the stack.
 -- Format:
--- | 5 bits (13 in decimal) | 3 bits (ignored) | 8 bits | 32 bits
+-- | 5 bits (13 in decimal) | 3 bits (ignored) | 8 bits | 8 bits
 sld :: Evaluator ()
-sld = join $ inc >> modifyReg <$> fetchByte <*> (fetchWord >>= getFromStack)
+sld = join $ inc >> modifyReg <$> fetchByte <*> (fetchByte >>= getFromStack)
 
 -- "Stack store" instruction.
 -- Store a word into the nth slot of the stack.
 -- Format:
--- | 5 bits (14 in decimal) | 1 bit (0) | 2 bits (ignored) | 32 bits | 8 bits
--- | 5 bits (14 in decimal) | 1 bit (1) | 2 bits (ignored) | 32 bits | 32 bits
+-- | 5 bits (14 in decimal) | 1 bit (0) | 2 bits (ignored) | 8 bits | 8 bits
+-- | 5 bits (14 in decimal) | 1 bit (1) | 2 bits (ignored) | 8 bits | 32 bits
 sst :: Evaluator ()
 sst = do
   sp <- fetchTest 5
-  join $ modifyStack <$> fetchWord <*> fetchOperand sp
+  join $ modifyStack <$> fetchByte <*> fetchOperand sp

@@ -81,13 +81,13 @@ spec = do
       let f rf s (Machine _ rf0 s0) = rf0 == rf && s0 == s
 
       -- "sld"
-      runMachine (Machine (code [13, 12, 0, 0, 0, 0, 10]) Map.empty [555]) `shouldSatisfy` f (Map.singleton 12 555) [555]
-      runMachine (Machine (code [13, 12, 0, 0, 0, 1, 10]) Map.empty [7, 3]) `shouldSatisfy` f (Map.singleton 12 3) [7, 3]
+      runMachine (Machine (code [13, 12, 0, 10]) Map.empty [555]) `shouldSatisfy` f (Map.singleton 12 555) [555]
+      runMachine (Machine (code [13, 12, 1, 10]) Map.empty [7, 3]) `shouldSatisfy` f (Map.singleton 12 3) [7, 3]
 
       -- "sst"
       let rf = Map.singleton 12 333 in
-        runMachine (Machine (code [14, 0, 0, 0, 0, 12, 10]) rf [0]) `shouldSatisfy` f rf [333]
+        runMachine (Machine (code [14, 0, 12, 10]) rf [0]) `shouldSatisfy` f rf [333]
       let rf = Map.singleton 5 9 in
-        runMachine (Machine (code [14, 0, 0, 0, 7, 5, 10]) rf [0, 1, 4, 8, 11, 3, 2, 0, 1]) `shouldSatisfy` f rf [0, 1, 4, 8, 11, 3, 2, 9, 1]
+        runMachine (Machine (code [14, 7, 5, 10]) rf [0, 1, 4, 8, 11, 3, 2, 0, 1]) `shouldSatisfy` f rf [0, 1, 4, 8, 11, 3, 2, 9, 1]
       let rf = Map.empty in
-        runMachine (Machine (code [0b00101110, 0, 0, 0, 1, 0, 0, 1, 123, 10]) rf [2, 4]) `shouldSatisfy` f rf [2, 379]
+        runMachine (Machine (code [0b00101110, 1, 0, 0, 1, 123, 10]) rf [2, 4]) `shouldSatisfy` f rf [2, 379]
