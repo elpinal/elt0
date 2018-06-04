@@ -192,12 +192,12 @@ lexWord p x = do
   b <- lift notFollowedByLetter
   unless b $
     lift getPos >>= throwE . FollowedByAlpha (x : s)
-  fmap (at p) $ lexDigits p (x : s) >>= validImm32 p
+  fmap (at p . Digits) $ lexDigits p (x : s) >>= validImm32 p
 
 -- Precondition: @n >= 0@ must hold.
-validImm32 :: Position -> Integer -> Lexer Token
-validImm32 p n | n > 1 + toInteger (maxBound :: Word32) = throwE $ OverflowImm32 n p
-validImm32 _ n = return $ Digits $ fromInteger n
+validImm32 :: Position -> Integer -> Lexer Word32
+validImm32 p n | n > toInteger (maxBound :: Word32) = throwE $ OverflowImm32 n p
+validImm32 _ n = return $ fromInteger n
 
 notFollowedByLetter :: Stream Bool
 notFollowedByLetter = Stream
