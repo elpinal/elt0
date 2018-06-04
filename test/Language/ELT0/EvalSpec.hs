@@ -67,16 +67,16 @@ spec = do
       run (code [0b00101001, 0, 0, 0, 8, 0xff, 0xff, 0b00100000, 8, 0, 0, 0, 230, 10]) `shouldBe` Map.singleton 8 230
 
       -- "salloc"
-      run (code [11, 0, 0, 0, 1, 10])                     `shouldBe` Map.empty
-      runS (code [11, 0, 0, 0, 1, 10]) []                 `shouldBe` [0]
-      runS (code [11, 0, 0, 0, 4, 10]) []                 `shouldBe` [0, 0, 0, 0]
-      runS (code [11, 0, 0, 0, 2, 11, 0, 0, 0, 5, 10]) [] `shouldBe` replicate 7 0
+      run (code [0b00101011, 10])                 `shouldBe` Map.empty
+      runS (code [0b00101011, 10]) []             `shouldBe` [0]
+      runS (code [0b10001011, 10]) []             `shouldBe` [0, 0, 0, 0]
+      runS (code [0b01001011, 0b10101011, 10]) [] `shouldBe` replicate 7 0
 
       -- "sfree"
       --runS (code [12, 0, 0, 0, 0, 10]) (replicate (2^32) 0)          `shouldBe` []
       --runS (code [12, 0, 0, 0, 0, 10]) (replicate (2^32 + 1) 5)      `shouldBe` [5]
-      runS (code [12, 0, 0, 0, 1, 10]) [12]                          `shouldBe` []
-      runS (code [12, 0, 0, 0, 4, 10]) [12, 1, 3, 18, 8031, 23, 922] `shouldBe` [12, 1, 3]
+      runS (code [0b00101100, 10]) [12]                          `shouldBe` []
+      runS (code [0b10001100, 10]) [12, 1, 3, 18, 8031, 23, 922] `shouldBe` [12, 1, 3]
 
       -- "sld"
       runFS (code [13, 12, 0, 10]) Map.empty [555]  `shouldBe` (Map.singleton 12 555, [555])

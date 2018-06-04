@@ -180,13 +180,14 @@ word' = minimal f ["word"]
 word :: Minimal W
 word = W <$> word'
 
-liftedWord :: Minimal Word32
-liftedWord = minimal f ["lifted word"]
+liftedWord8 :: Minimal Word8
+liftedWord8 = minimal f ["lifted 8-bit integer"]
   where
     f (Digits w)
-      | w /= 0 = return w
       | w == 0 = Nothing
-    f MaxNum = return 0
+      | w <= 7 = return $ fromIntegral w
+      | w == 8 = return 0
+      | 9 <= w = Nothing
     f _ = Nothing
 
 word8 :: Minimal Word8
@@ -328,8 +329,8 @@ inst = do
     , f TShl "shl" $> rnn Shl
     , f TShr "shr" $> rnn Shr
     , f TIf  "if"  $> (If <$> fromMinimal register <*> fromMinimal place)
-    , f TSalloc "salloc" $> (Salloc <$> fromMinimal liftedWord)
-    , f TSfree  "sfree"  $> (Sfree <$> fromMinimal liftedWord)
+    , f TSalloc "salloc" $> (Salloc <$> fromMinimal liftedWord8)
+    , f TSfree  "sfree"  $> (Sfree <$> fromMinimal liftedWord8)
     , f TSld "sld" $> (Sld <$> fromMinimal register <*> fromMinimal word8)
     , f TSst "sst" $> (Sst <$> fromMinimal word8 <*> fromMinimal operand)
     ]

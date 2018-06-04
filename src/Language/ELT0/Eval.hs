@@ -146,6 +146,9 @@ readTest i = flip testBit i <$> readByte
 fetchTest :: Int -> Evaluator s Bool
 fetchTest i = readTest i <* inc
 
+fetchShiftR :: Int -> Evaluator s Word8
+fetchShiftR i = flip shiftR i <$> fetchByte
+
 -- | Evaluates a program, then returns a calculated register file.
 run :: Code -> File
 run c = runFile c Map.empty
@@ -367,8 +370,9 @@ halt = empty
 liftST :: ST s a -> Evaluator s a
 liftST = lift . lift
 
-zero :: Word32 -> Integer
-zero 0 = 2 ^ (32 :: Int)
+-- zero :: { n :: Word8 | 0 <= n && n <= 7 } -> { r :: Integer | if n == 0 then r == 8 else r == n }
+zero :: Word8 -> Integer
+zero 0 = 2 ^ (3 :: Int)
 zero n = fromIntegral n
 
 extendCap :: Integer -> Integer
@@ -388,11 +392,11 @@ allocStack n = lift $ do
 
 -- "Stack allocation" instruction.
 -- Allocated slots are initialized to an undefined value.
--- If the operand is equal to 0, it is interpreted as 4294967296, which is equals to 2^32.
+-- If the operand is equal to 0, it is interpreted as 8, which is equals to 2^3.
 -- Format:
--- | 5 bits (11 in decimal) | 3 bits (ignored) | 32 bits
+-- | 5 bits (11 in decimal) | 3 bits
 salloc :: Evaluator s ()
-salloc = inc >> fetchWord >>= allocStack . zero
+salloc = fetchShiftR 5 >>= allocStack . zero
 
 markUnused :: Integer -> Evaluator s ()
 markUnused n = lift $ modify $ mapStack $ fmap f
@@ -400,11 +404,11 @@ markUnused n = lift $ modify $ mapStack $ fmap f
     f v = v { len = len v - n }
 
 -- "Stack free" instruction.
--- If the operand is equal to 0, it is interpreted as 4294967296, which is equals to 2^32.
+-- If the operand is equal to 0, it is interpreted as 8, which is equals to 2^3.
 -- Format:
--- | 5 bits (12 in decimal) | 3 bits (ignored) | 32 bits
+-- | 5 bits (12 in decimal) | 3 bits
 sfree :: Evaluator s ()
-sfree = inc >> fetchWord >>= markUnused . zero
+sfree = fetchShiftR 5 >>= markUnused . zero
 
 readStack :: Word8 -> Evaluator s Word32
 readStack w = lift $ do

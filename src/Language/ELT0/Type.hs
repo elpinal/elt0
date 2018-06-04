@@ -65,7 +65,7 @@ data TypeError
   -- |
   -- @ShortStack w l@ states that it is not possible to access @w@ slots of the
   -- stack whose length is @l@.
-  | ShortStack Word32 Word32
+  | ShortStack Word32 Integer
   | AccessToNonsense Word8 Stack
   | UnboundLabel String
   | UnboundRegister Reg
@@ -178,11 +178,11 @@ match e1 e2 = if e1 <: e2
   then return ()
   else liftEither $ Left $ Mismatch e1 e2
 
-sfree :: Word32 -> TypeChecker ()
+sfree :: Word8 -> TypeChecker ()
 sfree w = do
   s <- lift $ gets stack
-  let l = genericLength s
-  guardE (ShortStack w l) $ w <= l
+  let l = genericLength s :: Integer
+  guardE (ShortStack (fromIntegral w) l) $ fromIntegral w <= l
   putStack $ genericDrop w s
 
 putStack :: Stack -> TypeChecker ()
