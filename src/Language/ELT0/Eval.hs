@@ -1,10 +1,11 @@
 {-# LANGUAGE BinaryLiterals #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module Language.ELT0.Eval
   ( run
   , runFile
-  , runStack
-  , runMachine
+  , runS
+  , runFS
   , code
   , Code
   , Offset
@@ -12,13 +13,16 @@ module Language.ELT0.Eval
   , Machine(..)
   ) where
 
+import Control.Arrow hiding (loop)
 import Control.Applicative
 import Control.Monad
+import Control.Monad.ST
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.State.Lazy
+import Data.Array.ST
 import Data.Array.Unboxed
-import Data.Bifunctor
+import Data.Array.Unsafe
 import Data.Bits
 import Data.List
 import qualified Data.Map.Lazy as Map
@@ -63,38 +67,50 @@ type Offset = Word32
 
 type Code = (UArray Word32 Word8, Offset)
 
-type Stack = [Word32]
+data Vector s = Vector
+  { content :: STUArray s Integer Word32
+  , cap :: Integer
+  , len :: Integer
+  }
+  deriving Eq
 
-data Machine = Machine Code File Stack
-  deriving (Eq, Show)
+newtype Stack a = Stack { runStack :: a }
+  deriving (Eq, Functor)
 
-getCode :: Machine -> Code
-getCode (Machine c _ _) = c
+data Machine s = Machine
+  { text :: Code
+  , file :: File
+  , stack :: Stack (Vector s)
+  }
+  deriving Eq
 
-getFile :: Machine -> File
-getFile (Machine _ f _) = f
+vector :: ST s (Vector s)
+vector = do
+  a <- newArray_ (1, 0)
+  return $ Vector
+    { content = a
+    , cap = 0
+    , len = 0
+    }
 
-getStack :: Machine -> Stack
-getStack (Machine _ _ s) = s
+copy :: STUArray s Integer Word32 -> STUArray s Integer Word32 -> Integer -> Integer -> ST s ()
+copy new old i n
+  | i >= n    = return ()
+  | otherwise = readArray old (i + 1) >>= writeArray new (i + 1) >> copy new old (i + 1) n
 
-mapCode :: (Code -> Code) -> Machine -> Machine
-mapCode f (Machine c rf s) = Machine (f c) rf s
+putStack :: Monad m => Stack (Vector s) -> StateT (Machine s) m ()
+putStack s = modify $ \m -> m { stack = s }
 
-mapFile :: (File -> File) -> Machine -> Machine
-mapFile f (Machine c rf s) = Machine c (f rf) s
+mapStack :: (Stack (Vector s) -> Stack (Vector s)) -> Machine s -> Machine s
+mapStack f m = m { stack = f $ stack m }
 
-mapStack :: (Stack -> Stack) -> Machine -> Machine
-mapStack f (Machine c rf s) = Machine c rf $ f s
+mapCode :: (Code -> Code) -> Machine s -> Machine s
+mapCode f m = m { text = f $ text m }
 
-accessStack :: Word8 -> Stack -> Word32
-accessStack w s = s `genericIndex` w
+mapFile :: (File -> File) -> Machine s -> Machine s
+mapFile f m = m { file = f $ file m }
 
-insertStack :: Word8 -> Word32 -> Stack -> Stack
-insertStack 0 w (_ : s) = w : s
-insertStack i w (h : s) = h : insertStack (i - 1) w s
-insertStack _ _ [] = error "get stuck: empty stack"
-
-type Evaluator = MaybeT (State Machine)
+type Evaluator s = MaybeT (StateT (Machine s) (ST s))
 
 code :: [Word8] -> Code
 code l = (listArray (1, fromIntegral $ length l) l, 1)
@@ -108,26 +124,26 @@ setOffset o (a, _) = (a, o)
 incOffset :: Code -> Code
 incOffset = second (+ 1)
 
-jumpTo :: Offset -> Evaluator ()
+jumpTo :: Offset -> Evaluator s ()
 jumpTo o = lift $ modify $ mapCode $ setOffset o
 
-readByte :: Evaluator Word8
-readByte = lift $ gets $ getCur . getCode
+readByte :: Evaluator s Word8
+readByte = lift $ gets $ getCur . text
 
-readMask :: Word8 -> Evaluator Word8
+readMask :: Word8 -> Evaluator s Word8
 readMask m = (.&. m) <$> readByte
 
-inc :: Evaluator ()
+inc :: Evaluator s ()
 inc = lift $ modify $ mapCode incOffset
 
-fetchByte :: Evaluator Word8
+fetchByte :: Evaluator s Word8
 fetchByte = readByte <* inc
 
 -- @i@ starts from 0.
-readTest :: Int -> Evaluator Bool
+readTest :: Int -> Evaluator s Bool
 readTest i = flip testBit i <$> readByte
 
-fetchTest :: Int -> Evaluator Bool
+fetchTest :: Int -> Evaluator s Bool
 fetchTest i = readTest i <* inc
 
 -- | Evaluates a program, then returns a calculated register file.
@@ -138,24 +154,56 @@ run c = runFile c Map.empty
 -- Evaluates a program with an initial register file, then returns
 -- a calculated register file.
 runFile :: Code -> File -> File
-runFile c f = getFile . runMachine $ Machine c f mempty
+runFile c f = runST $ do
+  v <- vector
+  fmap file . runMachine $ Machine
+    { text = c
+    , file = f
+    , stack = Stack v
+    }
 
-runStack :: Code -> Stack -> Stack
-runStack c s = getStack . runMachine $ Machine c Map.empty s
+-- |
+-- Evaluates a program with an initial stack, then returns a calculated stack.
+runS :: Code -> [Word32] -> [Word32]
+runS c xs = runST $ do
+  let l = genericLength xs
+  inv <- thaw (listArray (1, l) xs :: UArray Integer Word32)
+  v <- runStack . stack <$> runMachine Machine
+    { text = c
+    , file = mempty
+    , stack = Stack $ Vector { content = inv, cap = l, len = l }
+    }
+  a <- unsafeFreeze $ content v
+  return $ genericTake (len v) $ elems (a :: UArray Integer Word32)
 
-runMachine :: Machine -> Machine
-runMachine = snd . runEvaluator program
+-- |
+-- Evaluates a program with an initial register file and stack, then
+-- returns a calculated register file and stack.
+runFS :: Code -> File -> [Word32] -> (File, [Word32])
+runFS c f xs = runST $ do
+  let l = genericLength xs
+  inv <- thaw (listArray (1, l) xs :: UArray Integer Word32)
+  m <- runMachine $ Machine
+    { text = c
+    , file = f
+    , stack = Stack $ Vector { content = inv, cap = l, len = l }
+    }
+  a <- unsafeFreeze $ content $ runStack $ stack m
+  return (file m, genericTake (len $ runStack $ stack m) $ elems (a :: UArray Integer Word32))
 
-runEvaluator :: Evaluator a -> Machine -> (Maybe a, Machine)
-runEvaluator e s = flip runState s $ runMaybeT e
+runMachine :: Machine s -> ST s (Machine s)
+runMachine = fmap snd . runEvaluator program
 
-program :: Evaluator ()
+runEvaluator :: Evaluator s a -> Machine s -> ST s (Maybe a, Machine s)
+runEvaluator e s = flip runStateT s $ runMaybeT e
+
+program :: Evaluator s ()
 program = forever instruction
 
-instruction :: Evaluator ()
+instruction :: Evaluator s ()
 instruction = readMask 0b11111 >>= f
   where
-    f :: Word8 -> Evaluator ()
+    f :: Word8 -> Evaluator s ()
     f 0 = mov
     f 1 = add
     f 2 = sub
@@ -173,14 +221,16 @@ instruction = readMask 0b11111 >>= f
     f 14 = sst
     f n = error $ "unknown opcode: " ++ show n
 
-modifyReg :: Word8 -> Word32 -> Evaluator ()
+modifyReg :: Word8 -> Word32 -> Evaluator s ()
 modifyReg r v = lift $ modify $ mapFile $ Map.insert r v
 
-modifyStack :: Word8 -> Word32 -> Evaluator ()
-modifyStack i w = lift $ modify $ mapStack $ insertStack i w
+modifyStack :: Word8 -> Word32 -> Evaluator s ()
+modifyStack i w = do
+  v <- lift $ gets $ runStack . stack
+  liftST $ writeArray (content v) (len v - fromIntegral i) w
 
-getVal :: Word8 -> Evaluator Word32
-getVal r = lift $ gets $ f r . getFile
+getVal :: Word8 -> Evaluator s Word32
+getVal r = lift $ gets $ f r . file
   where
     f = Map.findWithDefault $ error $ "getVal: no such register declared: " ++ show r
 
@@ -191,17 +241,17 @@ buildWord32 = foldl (\acc x -> shift acc 8 .|. toWord32 x) 0
     toWord32 :: Word8 -> Word32
     toWord32 = fromIntegral
 
-fetchReg :: Evaluator Word32
+fetchReg :: Evaluator s Word32
 fetchReg = fetchByte >>= getVal
 
-fetchWord :: Evaluator Word32
+fetchWord :: Evaluator s Word32
 fetchWord = buildWord32 <$> replicateM 4 fetchByte
 
 -- |
 -- Given 'False', 'fetchOperand' reads a byte and fetches a word from a corresponding register.
 -- Given 'True', 'fetchOperand' reads a word.
 -- In Both cases, the offset is automatically incremented.
-fetchOperand :: Bool -> Evaluator Word32
+fetchOperand :: Bool -> Evaluator s Word32
 fetchOperand False = fetchReg
 fetchOperand True  = fetchWord
 
@@ -209,7 +259,7 @@ fetchOperand True  = fetchWord
 -- For all o.
 -- | 5 bits (o) | 1 bit (0) | 2 bits (ignored) | 8 bits | 8 bits
 -- | 5 bits (o) | 1 bit (1) | 2 bits (ignored) | 8 bits | 32 bits
-ro :: (Word32 -> Word32) -> Evaluator ()
+ro :: (Word32 -> Word32) -> Evaluator s ()
 ro f = do
   sp <- fetchTest 5 -- an operand-format specifier
   r <- fetchByte
@@ -217,7 +267,7 @@ ro f = do
   modifyReg r $ f v
 
 -- Format: ROs(0)
-mov :: Evaluator ()
+mov :: Evaluator s ()
 mov = ro id
 
 -- Register-Operand-Operand (ROO) format scheme, called ROOs:
@@ -226,7 +276,7 @@ mov = ro id
 -- | 5 bits (o) | 2 bit (1) | 1 bits (ignored) | 8 bits | 32 bits | 8 bits
 -- | 5 bits (o) | 2 bit (2) | 1 bits (ignored) | 8 bits | 8 bits | 32 bits
 -- | 5 bits (o) | 2 bit (3) | 1 bits (ignored) | 8 bits | 32 bits | 32 bits
-roo :: (Word32 -> Word32 -> Word32) -> Evaluator ()
+roo :: (Word32 -> Word32 -> Word32) -> Evaluator s ()
 roo f = do
   sp1 <- readTest 5
   sp2 <- fetchTest 6
@@ -236,26 +286,26 @@ roo f = do
   modifyReg r $ v1 `f` v2
 
 -- Format: ROOs(1)
-add :: Evaluator ()
+add :: Evaluator s ()
 add = roo (+) -- Overflow may occur.
 
 -- Format: ROOs(2)
-sub :: Evaluator ()
+sub :: Evaluator s ()
 sub = roo (-) -- Overflow may occur.
 
 -- Format: ROOs(3)
 -- Bitwise "and" instruction.
-band :: Evaluator ()
+band :: Evaluator s ()
 band = roo (.&.)
 
 -- Format: ROOs(4)
 -- Bitwise "or" instruction.
-bor :: Evaluator ()
+bor :: Evaluator s ()
 bor = roo (.|.)
 
 -- Bitwise "not" instruction.
 -- Format: ROs(5)
-bnot :: Evaluator ()
+bnot :: Evaluator s ()
 bnot = ro complement
 
 toInt :: Word32 -> Int
@@ -268,7 +318,7 @@ toInt = fromIntegral
 -- The first argument is a destination register.
 -- The second argument is logically shifted left by the number of bits
 -- specified by the third argument.
-shl :: Evaluator ()
+shl :: Evaluator s ()
 shl = roo f
   where
     f x y = shiftL x $ toInt y
@@ -280,7 +330,7 @@ shl = roo f
 -- The first argument is a destination register.
 -- The second argument is logically shifted right by the number of bits
 -- specified by the third argument.
-shr :: Evaluator ()
+shr :: Evaluator s ()
 shr = roo f
   where
     f x y = shiftR x $ toInt y
@@ -291,7 +341,7 @@ shr = roo f
 -- Format:
 -- | 5 bits (8) | 1 bit (0) | 2 bits (ignored) | 8 bits | 8 bits
 -- | 5 bits (8) | 1 bit (1) | 2 bits (ignored) | 8 bits | 32 bits
-ifJmp :: Evaluator ()
+ifJmp :: Evaluator s ()
 ifJmp = do
   sp <- fetchTest 5
   rr <- fetchReg -- The right value of a register.
@@ -303,7 +353,7 @@ ifJmp = do
 -- Format:
 -- | 5 bits (9) | 1 bit (0) | 2 bits (ignored) | 8 bits
 -- | 5 bits (9) | 1 bit (1) | 2 bits (ignored) | 32 bits
-jmp :: Evaluator ()
+jmp :: Evaluator s ()
 jmp = do
   sp <- fetchTest 5
   v <- fetchOperand sp
@@ -311,61 +361,70 @@ jmp = do
 
 -- Format:
 -- | 5 bits (10 in decimal) | 3 bits (ignored)
-halt :: Evaluator ()
+halt :: Evaluator s ()
 halt = empty
 
-pushWord :: Word32 -> Evaluator ()
-pushWord w = lift . modify . mapStack $ (w :)
+liftST :: ST s a -> Evaluator s a
+liftST = lift . lift
+
+zero :: Word32 -> Integer
+zero 0 = 2 ^ (32 :: Int)
+zero n = fromIntegral n
+
+extendCap :: Integer -> Integer
+extendCap = (* 2) . (+ 1)
+
+allocStack :: Integer -> Evaluator s ()
+allocStack n = lift $ do
+  v <- gets $ runStack . stack
+  let need = len v + n
+  if need <= cap v
+    then putStack $ Stack v { len = need }
+    else do
+      let newCap = max need $ extendCap $ cap v
+      a <- lift $ newArray_ (1, newCap)
+      lift $ copy a (content v) 0 $ len v
+      putStack $ Stack Vector { content = a, cap = newCap, len = need }
 
 -- "Stack allocation" instruction.
--- Allocated slots are uninitialized. In fact, they are set to zero.
+-- Allocated slots are initialized to an undefined value.
 -- If the operand is equal to 0, it is interpreted as 4294967296, which is equals to 2^32.
 -- Format:
 -- | 5 bits (11 in decimal) | 3 bits (ignored) | 32 bits
-salloc :: Evaluator ()
-salloc = inc >> fetchWord >>= zero
+salloc :: Evaluator s ()
+salloc = inc >> fetchWord >>= allocStack . zero
+
+markUnused :: Integer -> Evaluator s ()
+markUnused n = lift $ modify $ mapStack $ fmap f
   where
-    zero 0 = replicateM_ 32 $ pushWord 0
-    zero cnt = loop cnt
-
-    loop cnt
-      | cnt == 0 = pure ()
-      | otherwise = pushWord 0 *> loop (cnt - 1)
-
-dropWord :: Evaluator ()
-dropWord = lift . modify $ mapStack $ \(_ : xs) -> xs
+    f v = v { len = len v - n }
 
 -- "Stack free" instruction.
 -- If the operand is equal to 0, it is interpreted as 4294967296, which is equals to 2^32.
 -- Format:
 -- | 5 bits (12 in decimal) | 3 bits (ignored) | 32 bits
-sfree :: Evaluator ()
-sfree = inc >> fetchWord >>= zero
-  where
-    zero 0 = replicateM_ 32 dropWord
-    zero cnt = loop cnt
+sfree :: Evaluator s ()
+sfree = inc >> fetchWord >>= markUnused . zero
 
-    loop cnt
-      | cnt == 0 = pure ()
-      | otherwise = dropWord *> loop (cnt - 1)
-
-getFromStack :: Word8 -> Evaluator Word32
-getFromStack w = lift . gets $ accessStack w . getStack
+readStack :: Word8 -> Evaluator s Word32
+readStack w = lift $ do
+  v <- gets $ runStack . stack
+  lift $ content v `readArray` (len v - fromIntegral w)
 
 -- "Stack load" instruction.
 -- Load a word from the nth slot of the stack into a register.
 -- The index starts from 0; the 0th slot is the top of the stack.
 -- Format:
 -- | 5 bits (13 in decimal) | 3 bits (ignored) | 8 bits | 8 bits
-sld :: Evaluator ()
-sld = join $ inc >> modifyReg <$> fetchByte <*> (fetchByte >>= getFromStack)
+sld :: Evaluator s ()
+sld = join $ inc >> modifyReg <$> fetchByte <*> (fetchByte >>= readStack)
 
 -- "Stack store" instruction.
 -- Store a word into the nth slot of the stack.
 -- Format:
 -- | 5 bits (14 in decimal) | 1 bit (0) | 2 bits (ignored) | 8 bits | 8 bits
 -- | 5 bits (14 in decimal) | 1 bit (1) | 2 bits (ignored) | 8 bits | 32 bits
-sst :: Evaluator ()
+sst :: Evaluator s ()
 sst = do
   sp <- fetchTest 5
   join $ modifyStack <$> fetchByte <*> fetchOperand sp

@@ -67,27 +67,25 @@ spec = do
       run (code [0b00101001, 0, 0, 0, 8, 0xff, 0xff, 0b00100000, 8, 0, 0, 0, 230, 10]) `shouldBe` Map.singleton 8 230
 
       -- "salloc"
-      run (code [11, 0, 0, 0, 1, 10])                         `shouldBe` Map.empty
-      runStack (code [11, 0, 0, 0, 1, 10]) []                 `shouldBe` [0]
-      runStack (code [11, 0, 0, 0, 4, 10]) []                 `shouldBe` [0, 0, 0, 0]
-      runStack (code [11, 0, 0, 0, 2, 11, 0, 0, 0, 5, 10]) [] `shouldBe` replicate 7 0
+      run (code [11, 0, 0, 0, 1, 10])                     `shouldBe` Map.empty
+      runS (code [11, 0, 0, 0, 1, 10]) []                 `shouldBe` [0]
+      runS (code [11, 0, 0, 0, 4, 10]) []                 `shouldBe` [0, 0, 0, 0]
+      runS (code [11, 0, 0, 0, 2, 11, 0, 0, 0, 5, 10]) [] `shouldBe` replicate 7 0
 
       -- "sfree"
-      --runStack (code [12, 0, 0, 0, 0, 10]) (replicate (2^32) 0)          `shouldBe` []
-      --runStack (code [12, 0, 0, 0, 0, 10]) (replicate (2^32 + 1) 5)      `shouldBe` [5]
-      runStack (code [12, 0, 0, 0, 1, 10]) [12]                          `shouldBe` []
-      runStack (code [12, 0, 0, 0, 4, 10]) [12, 1, 3, 18, 8031, 23, 922] `shouldBe` [8031, 23, 922]
-
-      let f rf s (Machine _ rf0 s0) = rf0 == rf && s0 == s
+      --runS (code [12, 0, 0, 0, 0, 10]) (replicate (2^32) 0)          `shouldBe` []
+      --runS (code [12, 0, 0, 0, 0, 10]) (replicate (2^32 + 1) 5)      `shouldBe` [5]
+      runS (code [12, 0, 0, 0, 1, 10]) [12]                          `shouldBe` []
+      runS (code [12, 0, 0, 0, 4, 10]) [12, 1, 3, 18, 8031, 23, 922] `shouldBe` [12, 1, 3]
 
       -- "sld"
-      runMachine (Machine (code [13, 12, 0, 10]) Map.empty [555]) `shouldSatisfy` f (Map.singleton 12 555) [555]
-      runMachine (Machine (code [13, 12, 1, 10]) Map.empty [7, 3]) `shouldSatisfy` f (Map.singleton 12 3) [7, 3]
+      runFS (code [13, 12, 0, 10]) Map.empty [555]  `shouldBe` (Map.singleton 12 555, [555])
+      runFS (code [13, 12, 1, 10]) Map.empty [7, 3] `shouldBe` (Map.singleton 12 7, [7, 3])
 
       -- "sst"
       let rf = Map.singleton 12 333 in
-        runMachine (Machine (code [14, 0, 12, 10]) rf [0]) `shouldSatisfy` f rf [333]
+        runFS (code [14, 0, 12, 10]) rf [0] `shouldBe` (rf, [333])
       let rf = Map.singleton 5 9 in
-        runMachine (Machine (code [14, 7, 5, 10]) rf [0, 1, 4, 8, 11, 3, 2, 0, 1]) `shouldSatisfy` f rf [0, 1, 4, 8, 11, 3, 2, 9, 1]
+        runFS (code [14, 7, 5, 10]) rf [0, 1, 4, 8, 11, 3, 2, 0, 1] `shouldBe` (rf, [0, 9, 4, 8, 11, 3, 2, 0, 1])
       let rf = Map.empty in
-        runMachine (Machine (code [0b00101110, 1, 0, 0, 1, 123, 10]) rf [2, 4]) `shouldSatisfy` f rf [2, 379]
+        runFS (code [0b00101110, 1, 0, 0, 1, 123, 10]) rf [2, 4] `shouldBe` (rf, [379, 4])
