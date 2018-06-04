@@ -185,8 +185,7 @@ liftedWord8 = minimal f ["lifted 8-bit integer"]
   where
     f (Digits w)
       | w == 0 = Nothing
-      | w <= 7 = return $ fromIntegral w
-      | w == 8 = return 0
+      | w <= 8 = return $ fromIntegral w
       | 9 <= w = Nothing
     f _ = Nothing
 

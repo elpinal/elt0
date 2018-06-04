@@ -65,8 +65,8 @@ data Inst
   | Shl Reg Numeric Numeric
   | Shr Reg Numeric Numeric
   | If  Reg Place
-  | Salloc Word8
-  | Sfree  Word8
+  | Salloc Word8 -- 1 to 8
+  | Sfree  Word8 -- 1 to 8
   | Sld    Reg Word8
   | Sst    Word8 Operand -- Allow labels to be used with the "sst" instruction.
   deriving (Eq, Show)
