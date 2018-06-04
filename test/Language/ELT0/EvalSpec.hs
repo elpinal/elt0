@@ -73,8 +73,8 @@ spec = do
       runS (code [0b01001011, 0b10101011, 10]) [] `shouldBe` replicate 7 0
 
       -- "sfree"
-      --runS (code [12, 0, 0, 0, 0, 10]) (replicate (2^32) 0)          `shouldBe` []
-      --runS (code [12, 0, 0, 0, 0, 10]) (replicate (2^32 + 1) 5)      `shouldBe` [5]
+      runS (code [0b00001100, 10]) [12, 1, 3, 18, 831, 23, 2, 1] `shouldBe` []
+      runS (code [0b00001100, 10]) [12, 1, 3, 3, 9, 5, 23, 2, 1] `shouldBe` [12]
       runS (code [0b00101100, 10]) [12]                          `shouldBe` []
       runS (code [0b10001100, 10]) [12, 1, 3, 18, 8031, 23, 922] `shouldBe` [12, 1, 3]
 
