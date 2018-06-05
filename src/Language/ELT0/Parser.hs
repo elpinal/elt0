@@ -288,7 +288,7 @@ slot = do
   a
 
 slotM :: Minimal (Parser (Slot Type))
-slotM = fmap (Slot . Just) <$> typeM -|- ns $> return (Slot Nothing)
+slotM = fmap Slot <$> typeM -|- ns $> return Nonsense -|- return . StackVar <$> tyVar
 
 ns :: Minimal ()
 ns = token NS $ show "NS"

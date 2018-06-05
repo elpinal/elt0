@@ -105,7 +105,10 @@ type File = Map.Map Reg Type
 
 type Stack = [Slot Type]
 
-newtype Slot a = Slot { runSlot :: Maybe a }
+data Slot a
+  = Nonsense
+  | Slot a
+  | StackVar String
   deriving (Eq, Show)
 
 class Display a where
@@ -165,9 +168,9 @@ instance Display Type where
 
 instance Display a => Display (Slot a) where
   -- "NS" stands for nonsense; see [Stack-Based Typed Assembly Language] (1998) by Morrisett et al.
-  displayS s = case runSlot s of
-    Nothing -> showString "NS"
-    Just x -> displayS x
+  displayS Nonsense = showString "NS"
+  displayS (Slot x) = displayS x
+  displayS (StackVar s) = showString s
 
 instance Display Env where
   displayS e = showString "Code" . b (binding e) . f (file e) . s (stack e)
