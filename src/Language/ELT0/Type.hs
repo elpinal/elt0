@@ -34,7 +34,7 @@ fromProgram (Program bs) = foldrM p Map.empty bs
     p (Block l e _ _) h = return $ Map.insert l (Code e) h
 
 isStackVar :: Slot a -> Bool
-isStackVar (StackVar _) = True
+isStackVar (StackVar _ _) = True
 isStackVar _ = False
 
 lenInteger :: Stack -> Integer
@@ -55,7 +55,7 @@ nth w s = req w s >>= f . snd
     f (x : _) = case x of
       Slot t -> return t
       Nonsense -> Left $ AccessToNonsense w s
-      StackVar _ -> Left $ UnderStackVar w s
+      StackVar _ _ -> Left $ UnderStackVar w s
 
 headMay :: [a] -> Maybe a
 headMay [] = Nothing

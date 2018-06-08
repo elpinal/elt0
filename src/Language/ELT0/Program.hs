@@ -108,7 +108,7 @@ type Stack = [Slot Type]
 data Slot a
   = Nonsense
   | Slot a
-  | StackVar String
+  | StackVar String Int
   deriving (Eq, Show)
 
 class Display a where
@@ -170,7 +170,7 @@ instance Display a => Display (Slot a) where
   -- "NS" stands for nonsense; see [Stack-Based Typed Assembly Language] (1998) by Morrisett et al.
   displayS Nonsense = showString "NS"
   displayS (Slot x) = displayS x
-  displayS (StackVar s) = showString s
+  displayS (StackVar s _) = showString s
 
 instance Display Env where
   displayS e = showString "Code" . b (binding e) . f (file e) . s (stack e)
