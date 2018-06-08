@@ -96,6 +96,7 @@ data TypeError
   | UnboundLabel String
   | UnboundRegister Reg
   | DuplicateLabel String
+  | NotPolymorphic Stack Env
   deriving (Eq, Show)
 
 instance Display TypeError where
@@ -110,6 +111,7 @@ instance Display TypeError where
   displayS (UnboundLabel s)       = showString "unbound label: " . shows s
   displayS (UnboundRegister r)    = showString "unbound register: " . displayS r
   displayS (DuplicateLabel s)     = showString "duplicate label declaration: " . shows s
+  displayS (NotPolymorphic s e)   = showString "could not instantiate a monomorphic environment with " . shows s . showString ": " . displayS e
 
 getFile :: TypeChecker File
 getFile = lift $ gets file
@@ -228,3 +230,69 @@ instance Subtyping Env where
 instance Subtyping File where
   -- | Width subtyping for records.
   f1 <: f2 = Map.isSubmapOf f2 f1
+
+instantiate :: [Stack] -> Env -> Either TypeError Env
+instantiate [] e = return e
+instantiate (x : xs) e = do
+  b <- remove $ binding e
+  instantiate xs $ substTop x $ e { binding = b }
+    where
+      remove [] = Left $ NotPolymorphic x e
+      remove (_ : ys) = return ys
+
+class Shift a where
+  shiftAbove :: Int -> Int -> a -> a
+  shift :: Int -> a -> a
+  shift = shiftAbove 0
+
+class Subst a where
+  -- | Warning: 'subst' is rarely used directly.
+  subst :: Int -> Stack -> a -> a
+  substTop :: Stack -> a -> a
+  substTop = subst 0
+
+instance Shift (Slot Type) where
+  shiftAbove _ _ Nonsense = Nonsense
+  shiftAbove c d (StackVar s n) = if c <= n then StackVar s $ n + d else StackVar s n
+  shiftAbove c d (Slot t) = Slot $ shiftAbove c d t
+
+instance Shift Type where
+  shiftAbove _ _ Int = Int
+  shiftAbove c d (Code e) = Code $ shiftAbove c d e
+
+instance Subst Type where
+  subst _ _ Int = Int
+  subst i s (Code e) = Code $ subst i s e
+
+instance Shift Env where
+  shiftAbove c0 d e = e
+    { file = shiftAbove c d (file e)
+    , stack = shiftAbove c d (stack e)
+    }
+    where
+      c = c0 + length (binding e)
+
+instance Subst Env where
+  subst i0 s e = e
+    { file = subst i s (file e)
+    , stack = subst i s (stack e)
+    }
+    where
+      i = i0 + length (binding e)
+
+instance Shift File where
+  shiftAbove c d f = Map.map (shiftAbove c d) f
+
+instance Subst File where
+  subst i s f = Map.map (subst i s) f
+
+instance Shift Stack where
+  shiftAbove c d s = map (shiftAbove c d) s
+
+instance Subst Stack where
+  subst i s = concatMap f
+    where
+      f :: Slot Type -> Stack
+      f Nonsense = [Nonsense]
+      f (StackVar str n) = if i == n then shift i s else [StackVar str n]
+      f (Slot t) = [Slot $ subst i s t]
