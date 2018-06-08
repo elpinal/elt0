@@ -225,7 +225,7 @@ code :: Minimal ()
 code = token CodeType $ show "Code"
 
 typeM :: Minimal (StateT Context Parser Type)
-typeM = int $> return Int -|- code $> (Code <$> parseEnv)
+typeM = int $> return Int -|- code $> (Code <$> parseEnv True)
 
 typ :: StateT Context Parser Type
 typ = join $ lift $ fromMinimal typeM
@@ -314,13 +314,14 @@ tyVar = minimal f ["type variable"]
 (^>) :: Monad m => m (Maybe a) -> m b -> m (Maybe b)
 x ^> y = x >>= maybe (return Nothing) (const $ Just <$> y)
 
-parseEnv :: StateT Context Parser Env
-parseEnv = do
+parseEnv :: Bool -> StateT Context Parser Env
+parseEnv escape = do
   xs <- lift typeAssignment
   modify $ f xs
   mf <- lift (option lBrace) ^> parseFile
   ms <- lift (option lBrack) ^> parseStack
-  modify $ drop $ length xs
+  when escape $
+    modify $ drop $ length xs
   return $ Env
     { binding = xs
     , file = fromMaybe mempty mf
@@ -330,28 +331,51 @@ parseEnv = do
     f [] ys = ys
     f (x : xs) ys = f xs $ x : ys
 
-inst :: Parser (Maybe Inst)
+stArgs :: StateT Context Parser [Stack]
+stArgs = do
+  m <- lift $ option lBrack
+  case m of
+    Nothing -> return []
+    Just () -> do
+      ms <- lift (option lBrack) ^> parseStack
+      maybe end f ms
+  where
+    f :: Stack -> StateT Context Parser [Stack]
+    f s = do
+      ms <- lift (option lBrack) ^> parseStack
+      (s :) <$> maybe end f ms
+    end = lift (fromMinimal rBrack) >> return []
+
+stApp :: Minimal a -> StateT Context Parser (STApp a)
+stApp m = do
+  x <- lift $ fromMinimal m
+  ss <- stArgs
+  return $ STApp x ss
+
+inst :: StateT Context Parser (Maybe Inst)
 inst = do
-  ma <- option $ foldl1 (-|-)
-    [ f TMov "mov" $> (Mov <$> fromMinimal register <*> fromMinimal operand)
-    , f TAdd "add" $> rnn Add
-    , f TSub "sub" $> rnn Sub
-    , f TAnd "and" $> rnn And
-    , f TOr  "or"  $> rnn Or
-    , f TNot "not" $> (Not <$> fromMinimal register <*> fromMinimal numeric)
-    , f TShl "shl" $> rnn Shl
-    , f TShr "shr" $> rnn Shr
-    , f TIf  "if"  $> (If <$> fromMinimal register <*> fromMinimal place)
-    , f TSalloc "salloc" $> (Salloc <$> fromMinimal liftedWord8)
-    , f TSfree  "sfree"  $> (Sfree <$> fromMinimal liftedWord8)
-    , f TSld "sld" $> (Sld <$> fromMinimal register <*> fromMinimal word8)
-    , f TSst "sst" $> (Sst <$> fromMinimal word8 <*> fromMinimal operand)
+  ma <- lift $ option $ foldl1 (-|-)
+    [ f TMov "mov" $> (Mov <$> fm register <*> stApp operand)
+    , f TAdd "add" $> rnnl Add
+    , f TSub "sub" $> rnnl Sub
+    , f TAnd "and" $> rnnl And
+    , f TOr  "or"  $> rnnl Or
+    , f TNot "not" $> (Not <$> fm register <*> fm numeric)
+    , f TShl "shl" $> rnnl Shl
+    , f TShr "shr" $> rnnl Shr
+    , f TIf  "if"  $> (If <$> fm register <*> stApp place)
+    , f TSalloc "salloc" $> (Salloc <$> fm liftedWord8)
+    , f TSfree  "sfree"  $> (Sfree <$> fm liftedWord8)
+    , f TSld "sld" $> (Sld <$> fm register <*> fm word8)
+    , f TSst "sst" $> (Sst <$> fm word8 <*> stApp operand)
     ]
   maybe (return Nothing) (fmap Just) ma
   where
     f t e = minimal (g t) [e]
     g m0 (Mnem m) = if m == m0 then return () else Nothing
     g _ _ =  Nothing
+    fm = lift . fromMinimal
+    rnnl = lift . rnn
 
 rnn :: (Reg -> Numeric -> Numeric -> Inst) -> Parser Inst
 rnn f = f <$> fromMinimal register <*> fromMinimal numeric <*> fromMinimal numeric
@@ -362,20 +386,18 @@ halt = token Halt "halt"
 jmp :: Minimal ()
 jmp = token Jmp "jmp"
 
-terminator :: Parser (Maybe Place)
-terminator = do
-  a <- fromMinimal $ halt $> return Nothing -|- jmp $> (Just <$> fromMinimal place)
-  a
+terminator :: StateT Context Parser (Maybe (STApp Place))
+terminator = join $ lift . fromMinimal $ halt $> return Nothing -|- jmp $> (Just <$> stApp place)
 
 block :: Parser (Maybe Block)
 block = do
   ms <- option label
   case ms of
     Nothing -> return Nothing
-    Just s -> do
-      fromMinimal code
-      e <- evalStateT parseEnv []
-      fromMinimal colon
+    Just s -> flip evalStateT [] $ do
+      lift $ fromMinimal code
+      e <- parseEnv False
+      lift $ fromMinimal colon
       is <- p
       mp <- terminator
       return $ Just $ Block s e is mp

@@ -7,6 +7,8 @@ module Language.ELT0.Program
   , File
   , Stack
   , Slot(..)
+  , STApp(..)
+  , eraseST
   , Inst(..)
   , Reg(..)
   , Operand(..)
@@ -27,6 +29,7 @@ module Language.ELT0.Program
 
 import Data.List
 import qualified Data.Map.Lazy as Map
+import Data.Monoid
 import Data.Word
 
 newtype Reg = Reg Word8
@@ -55,8 +58,15 @@ data Place
   | PLabel String
   deriving (Eq, Show)
 
+-- | An application to stack types
+data STApp a = STApp a [Stack]
+  deriving (Eq, Show)
+
+eraseST :: STApp a -> a
+eraseST (STApp x _) = x
+
 data Inst
-  = Mov Reg Operand
+  = Mov Reg (STApp Operand)
   | Add Reg Numeric Numeric
   | Sub Reg Numeric Numeric
   | And Reg Numeric Numeric
@@ -64,17 +74,17 @@ data Inst
   | Not Reg Numeric
   | Shl Reg Numeric Numeric
   | Shr Reg Numeric Numeric
-  | If  Reg Place
+  | If  Reg (STApp Place)
   | Salloc Word8 -- 1 to 8
   | Sfree  Word8 -- 1 to 8
   | Sld    Reg Word8
-  | Sst    Word8 Operand -- Allow labels to be used with the "sst" instruction.
+  | Sst    Word8 (STApp Operand) -- Allow labels to be used with the "sst" instruction.
   deriving (Eq, Show)
 
 newtype Program = Program [Block]
   deriving (Eq, Show)
 
-data Block = Block String Env [Inst] (Maybe Place)
+data Block = Block String Env [Inst] (Maybe (STApp Place))
   deriving (Eq, Show)
 
 data Type
@@ -138,6 +148,13 @@ instance Display Place where
   displayS (PRegister r) = displayS r
   displayS (PLabel s) = showString s
 
+instance Display a => Display (STApp a) where
+  displayS (STApp x ss) = displayS x . brack (null ss) (f ss)
+    where
+      f = appEndo . foldMap Endo . intersperse (showChar ' ') . map displayStack
+      brack True i = i
+      brack False i = showChar '[' . i . showChar ']'
+
 instance Display Inst where
   displayS (Mov r o)     = showString "mov"    |.| displayS r |.| displayS o
   displayS (Add r o1 o2) = showString "add"    |.| displayS r |.| displayS o1 |.| displayS o2
@@ -172,13 +189,17 @@ instance Display a => Display (Slot a) where
   displayS (Slot x) = displayS x
   displayS (StackVar s _) = showString s
 
-instance Display Env where
-  displayS e = showString "Code" . b (binding e) . f (file e) . s (stack e)
-    where
-      f i = if i == mempty then id else displayBrace $ j $ map pair $ Map.assocs i
-      s i = if i == mempty then id else displayBrack $ j $ map displayS i
+displayStack :: Stack -> ShowS
+displayStack s = if s == mempty then id else displayBrack $ joinByCommas $ map displayS s
 
-      j = foldr (.) id . intersperse (showString ", ")
+joinByCommas :: [ShowS] -> ShowS
+joinByCommas = foldr (.) id . intersperse (showString ", ")
+
+instance Display Env where
+  displayS e = showString "Code" . b (binding e) . f (file e) . displayStack (stack e)
+    where
+      f i = if i == mempty then id else displayBrace $ joinByCommas $ map pair $ Map.assocs i
+
       pair (r, t) = displayS r . showString ": " . displayS t
 
       b :: [String] -> String -> String

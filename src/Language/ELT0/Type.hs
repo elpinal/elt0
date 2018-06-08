@@ -96,7 +96,7 @@ data TypeError
   | UnboundLabel String
   | UnboundRegister Reg
   | DuplicateLabel String
-  | NotPolymorphic Stack Env
+  | NotPolymorphic [Stack] Type
   deriving (Eq, Show)
 
 instance Display TypeError where
@@ -111,7 +111,7 @@ instance Display TypeError where
   displayS (UnboundLabel s)       = showString "unbound label: " . shows s
   displayS (UnboundRegister r)    = showString "unbound register: " . displayS r
   displayS (DuplicateLabel s)     = showString "duplicate label declaration: " . shows s
-  displayS (NotPolymorphic s e)   = showString "could not instantiate a monomorphic environment with " . shows s . showString ": " . displayS e
+  displayS (NotPolymorphic ss t)  = showString "could not instantiate a monomorphic type with " . shows ss . showString ": " . displayS t
 
 getFile :: TypeChecker File
 getFile = lift $ gets file
@@ -143,6 +143,15 @@ instance Typed Numeric Type where
 instance Typed Place Type where
   typeOf (PRegister r) = typeOf r
   typeOf (PLabel s) = lookupHeap s
+
+instance Typed t Type => Typed (STApp t) Type where
+  typeOf (STApp x ss) = typeOf x >>= \t ->
+    case t of
+      Code e -> liftEither $ Code <$> instantiate ss e
+      Int -> if null ss then return Int else liftEither $ Left $ NotPolymorphic ss Int
+
+instance Typed t Type => Typed (STApp t) Env where
+  typeOf (STApp x ss) = typeOf x >>= liftEither . fromCode >>= liftEither . instantiate ss
 
 instance Typed Inst () where
   typeOf (Mov r o)     = typeOf o >>= insertFile r
@@ -195,8 +204,8 @@ fromCode Int      = Left $ MustCode Int
 liftEither :: Either TypeError a -> TypeChecker a
 liftEither = lift . lift
 
-guardMatch :: Place -> TypeChecker ()
-guardMatch p = join $ match <$> lift get <*> (typeOf p >>= liftEither . fromCode)
+guardMatch :: STApp Place -> TypeChecker ()
+guardMatch p = join $ match <$> lift get <*> typeOf p
 
 -- |
 -- @match e1 e2@ tests whether @e1@ matches @e2@.
@@ -237,7 +246,7 @@ instantiate (x : xs) e = do
   b <- remove $ binding e
   instantiate xs $ substTop x $ e { binding = b }
     where
-      remove [] = Left $ NotPolymorphic x e
+      remove [] = Left $ NotPolymorphic (x : xs) $ Code e
       remove (_ : ys) = return ys
 
 class Shift a where
