@@ -198,7 +198,6 @@ isInt _ = False
 guardInt :: Typed a Type => a -> TypeChecker ()
 guardInt n = typeOf n >>= guardE . MustInt <*> isInt
 
--- Note: if allowed quantification over 'Code', 'fromCode' should return also polymorphic 'Code'.
 fromCode :: Type -> Either TypeError Env
 fromCode (Code e) = return e
 fromCode Int      = Left $ MustCode Int
