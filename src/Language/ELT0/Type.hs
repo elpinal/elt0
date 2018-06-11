@@ -97,21 +97,23 @@ data TypeError
   | UnboundRegister Reg
   | DuplicateLabel String
   | NotPolymorphic [Stack] Type
+  | NotFullyInstantiated Env
   deriving (Eq, Show)
 
 instance Display TypeError where
-  displayS (MustInt t)            = showString "expected Int, but got " . displayS t
-  displayS (MustCode t)           = showString "expected Code, but got " . displayS t
-  displayS (MissingHeap s)        = showString "heap for " . showString s . showString " is not given" -- rare case
-  displayS (Mismatch e1 e2)       = displayS e1 . showString " does not match " . displayS e2
-  displayS (ShortStack w l)       = showString "stack is required to have at least " . shows w . showString " slots, but indeed its length is " . shows l
-  displayS (ShortStackZ w l)      = showString "could not access to the nth (n = " . shows w . showString ") slot since its length is " . shows l
-  displayS (AccessToNonsense w s) = showString "access to nonsense: " . shows w . showString " of " . shows s
-  displayS (UnderStackVar w s)    = showString "access to a slot under some stack variable: " . shows w . showString " of " . shows s
-  displayS (UnboundLabel s)       = showString "unbound label: " . shows s
-  displayS (UnboundRegister r)    = showString "unbound register: " . displayS r
-  displayS (DuplicateLabel s)     = showString "duplicate label declaration: " . shows s
-  displayS (NotPolymorphic ss t)  = showString "could not instantiate a monomorphic type with " . shows ss . showString ": " . displayS t
+  displayS (MustInt t)              = showString "expected Int, but got " . displayS t
+  displayS (MustCode t)             = showString "expected Code, but got " . displayS t
+  displayS (MissingHeap s)          = showString "heap for " . showString s . showString " is not given" -- rare case
+  displayS (Mismatch e1 e2)         = displayS e1 . showString " does not match " . displayS e2
+  displayS (ShortStack w l)         = showString "stack is required to have at least " . shows w . showString " slots, but indeed its length is " . shows l
+  displayS (ShortStackZ w l)        = showString "could not access to the nth (n = " . shows w . showString ") slot since its length is " . shows l
+  displayS (AccessToNonsense w s)   = showString "access to nonsense: " . shows w . showString " of " . shows s
+  displayS (UnderStackVar w s)      = showString "access to a slot under some stack variable: " . shows w . showString " of " . shows s
+  displayS (UnboundLabel s)         = showString "unbound label: " . shows s
+  displayS (UnboundRegister r)      = showString "unbound register: " . displayS r
+  displayS (DuplicateLabel s)       = showString "duplicate label declaration: " . shows s
+  displayS (NotPolymorphic ss t)    = showString "could not instantiate a monomorphic type with " . shows ss . showString ": " . displayS t
+  displayS (NotFullyInstantiated e) = showString "not fully instantiated: " . displayS e
 
 getFile :: TypeChecker File
 getFile = lift $ gets file
@@ -205,7 +207,11 @@ liftEither :: Either TypeError a -> TypeChecker a
 liftEither = lift . lift
 
 guardMatch :: STApp Place -> TypeChecker ()
-guardMatch p = join $ match <$> lift get <*> typeOf p
+guardMatch p = join $ match <$> lift get <*> (typeOf p >>= liftEither . full)
+  where
+    full e = if null $ binding e
+      then return e
+      else Left $ NotFullyInstantiated e
 
 -- |
 -- @match e1 e2@ tests whether @e1@ matches @e2@.
