@@ -31,7 +31,7 @@ accBlock prev (Block l _ is mp) = r { book = Map.insert l (lengthR prev) $ book 
   where
     r = prev <> block is mp
 
-block :: [Inst] -> Maybe Place -> Recorder
+block :: [Inst] -> Maybe (STApp Place) -> Recorder
 block is mp = foldMap inst is <> terminator mp
 
 reg :: Reg -> Builder
@@ -68,9 +68,9 @@ opfs :: IsValue a => a -> Word8 -> Word8
 opfs x b = b .|. setIfValue x 5
 
 inst :: Inst -> Recorder
-inst (Mov r o) = word8 (opfs o 0) <> reg r |- operand o
-inst (If r p)  = word8 (opfs p 8) <> reg r |- place p
-inst (Sst w o) = word8 (opfs o 14) <> word8 w |- operand o
+inst (Mov r o) = word8 (opfs (eraseST o) 0) <> reg r |- operand (eraseST o)
+inst (If r p)  = word8 (opfs (eraseST p) 8) <> reg r |- place (eraseST p)
+inst (Sst w o) = word8 (opfs (eraseST o) 14) <> word8 w |- operand (eraseST o)
 inst i = fromBuilder $ inst' i
 
 inst' :: Inst -> Builder
@@ -92,8 +92,8 @@ rnn opcode r n1 n2 = word8 (opcode .|. setIfValue n1 5 .|. setIfValue n2 6) <> r
 rn :: Word8 -> Reg -> Numeric -> Builder
 rn opcode r n = word8 (opfs n opcode) <> reg r <> numeric n
 
-terminator :: Maybe Place -> Recorder
-terminator = maybe halt jmp
+terminator :: Maybe (STApp Place) -> Recorder
+terminator = maybe halt $ jmp . eraseST
 
 halt :: Recorder
 halt = fromBuilder $ word8 10

@@ -26,6 +26,9 @@ module Language.ELT0.Parser
   ) where
 
 import Control.Applicative
+import Control.Monad
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.State.Lazy
 import Data.Bifunctor
 import Data.Functor
 import Data.List
@@ -221,22 +224,20 @@ int = token IntType $ show "Int"
 code :: Minimal ()
 code = token CodeType $ show "Code"
 
-typeM :: Minimal (Parser Type)
-typeM = int $> return Int -|- code $> (Code <$> parseEnv)
+typeM :: Minimal (StateT Context Parser Type)
+typeM = int $> return Int -|- code $> (Code <$> parseEnv True)
 
-typ :: Parser Type
-typ = do
-  a <- fromMinimal typeM
-  a
+typ :: StateT Context Parser Type
+typ = join $ lift $ fromMinimal typeM
 
-parseFile :: Parser File
+parseFile :: StateT Context Parser File
 parseFile = do
   e <- row1 >>= p
-  fromMinimal rBrace
+  lift $ fromMinimal rBrace
   return e
   where
     rows = do
-      m <- option comma
+      m <- lift $ option comma
       case m of
         Just () -> (:) <$> row <*> rows
         Nothing -> return []
@@ -246,52 +247,60 @@ parseFile = do
       xs <- rows
       return $ Map.fromList $ x : xs
 
-row1 :: Parser (Maybe (Reg, Type))
+row1 :: StateT Context Parser (Maybe (Reg, Type))
 row1 = do
-  mr <- option register
+  mr <- lift $ option register
   case mr of
     Nothing -> return Nothing
     Just r -> do
-      fromMinimal colon
+      lift $ fromMinimal colon
       t <- typ
       return $ Just (r, t)
 
-row :: Parser (Reg, Type)
+row :: StateT Context Parser (Reg, Type)
 row = do
-  r <- fromMinimal register
-  fromMinimal colon
+  r <- lift $ fromMinimal register
+  lift $ fromMinimal colon
   t <- typ
   return (r, t)
 
-parseStack :: Parser Stack
-parseStack = (slot1 >>= p) <* fromMinimal rBrack
+parseStack :: StateT Context Parser Stack
+parseStack = (slot1 >>= p) <* lift (fromMinimal rBrack)
   where
     p Nothing = return mempty
     p (Just x) = (x :) <$> slots
 
     slots = do
-      m <- option comma
+      m <- lift $ option comma
       case m of
         Just () -> (:) <$> slot <*> slots
         Nothing -> return []
 
-slot1 :: Parser (Maybe (Slot Type))
+slot1 :: StateT Context Parser (Maybe (Slot Type))
 slot1 = do
-  ma <- option slotM
+  ma <- slotM >>= lift . option
   case ma of
     Nothing -> return Nothing
     Just a -> Just <$> a
 
-slot :: Parser (Slot Type)
-slot = do
-  a <- fromMinimal slotM
-  a
+slot :: StateT Context Parser (Slot Type)
+slot = join $ slotM >>= lift . fromMinimal
 
-slotM :: Minimal (Parser (Slot Type))
-slotM = fmap (Slot . Just) <$> typeM -|- ns $> return (Slot Nothing)
+slotM :: Monad m => StateT Context m (Minimal (StateT Context Parser (Slot Type)))
+slotM = do
+  tv <- bTyVar
+  return $ fmap Slot <$> typeM -|- ns $> return Nonsense -|- return <$> tv
 
 ns :: Minimal ()
 ns = token NS $ show "NS"
+
+bTyVar :: Monad m => StateT Context m (Minimal (Slot a))
+bTyVar = do
+  ctx <- get
+  return $ minimal (f ctx) ["bound type variable"]
+  where
+    f ctx (Ident s) = StackVar s <$> elemIndex s ctx
+    f _ _ = Nothing
 
 typeAssignment :: Parser [String]
 typeAssignment = option tyVar >>= maybe (return []) ((<$> typeAssignment) . (:))
@@ -305,39 +314,68 @@ tyVar = minimal f ["type variable"]
 (^>) :: Monad m => m (Maybe a) -> m b -> m (Maybe b)
 x ^> y = x >>= maybe (return Nothing) (const $ Just <$> y)
 
-parseEnv :: Parser Env
-parseEnv = do
-  xs <- typeAssignment
-  mf <- option lBrace ^> parseFile
-  ms <- option lBrack ^> parseStack
+parseEnv :: Bool -> StateT Context Parser Env
+parseEnv escape = do
+  xs <- lift typeAssignment
+  modify $ f xs
+  mf <- lift (option lBrace) ^> parseFile
+  ms <- lift (option lBrack) ^> parseStack
+  when escape $
+    modify $ drop $ length xs
   return $ Env
     { binding = xs
     , file = fromMaybe mempty mf
     , stack = fromMaybe mempty ms
     }
+  where
+    f [] ys = ys
+    f (x : xs) ys = f xs $ x : ys
 
-inst :: Parser (Maybe Inst)
+stArgs :: StateT Context Parser [Stack]
+stArgs = do
+  m <- lift $ option lBrack
+  case m of
+    Nothing -> return []
+    Just () -> do
+      ms <- lift (option lBrack) ^> parseStack
+      maybe end f ms
+  where
+    f :: Stack -> StateT Context Parser [Stack]
+    f s = do
+      ms <- lift (option lBrack) ^> parseStack
+      (s :) <$> maybe end f ms
+    end = lift (fromMinimal rBrack) >> return []
+
+stApp :: Minimal a -> StateT Context Parser (STApp a)
+stApp m = do
+  x <- lift $ fromMinimal m
+  ss <- stArgs
+  return $ STApp x ss
+
+inst :: StateT Context Parser (Maybe Inst)
 inst = do
-  ma <- option $ foldl1 (-|-)
-    [ f TMov "mov" $> (Mov <$> fromMinimal register <*> fromMinimal operand)
-    , f TAdd "add" $> rnn Add
-    , f TSub "sub" $> rnn Sub
-    , f TAnd "and" $> rnn And
-    , f TOr  "or"  $> rnn Or
-    , f TNot "not" $> (Not <$> fromMinimal register <*> fromMinimal numeric)
-    , f TShl "shl" $> rnn Shl
-    , f TShr "shr" $> rnn Shr
-    , f TIf  "if"  $> (If <$> fromMinimal register <*> fromMinimal place)
-    , f TSalloc "salloc" $> (Salloc <$> fromMinimal liftedWord8)
-    , f TSfree  "sfree"  $> (Sfree <$> fromMinimal liftedWord8)
-    , f TSld "sld" $> (Sld <$> fromMinimal register <*> fromMinimal word8)
-    , f TSst "sst" $> (Sst <$> fromMinimal word8 <*> fromMinimal operand)
+  ma <- lift $ option $ foldl1 (-|-)
+    [ f TMov "mov" $> (Mov <$> fm register <*> stApp operand)
+    , f TAdd "add" $> rnnl Add
+    , f TSub "sub" $> rnnl Sub
+    , f TAnd "and" $> rnnl And
+    , f TOr  "or"  $> rnnl Or
+    , f TNot "not" $> (Not <$> fm register <*> fm numeric)
+    , f TShl "shl" $> rnnl Shl
+    , f TShr "shr" $> rnnl Shr
+    , f TIf  "if"  $> (If <$> fm register <*> stApp place)
+    , f TSalloc "salloc" $> (Salloc <$> fm liftedWord8)
+    , f TSfree  "sfree"  $> (Sfree <$> fm liftedWord8)
+    , f TSld "sld" $> (Sld <$> fm register <*> fm word8)
+    , f TSst "sst" $> (Sst <$> fm word8 <*> stApp operand)
     ]
   maybe (return Nothing) (fmap Just) ma
   where
     f t e = minimal (g t) [e]
     g m0 (Mnem m) = if m == m0 then return () else Nothing
     g _ _ =  Nothing
+    fm = lift . fromMinimal
+    rnnl = lift . rnn
 
 rnn :: (Reg -> Numeric -> Numeric -> Inst) -> Parser Inst
 rnn f = f <$> fromMinimal register <*> fromMinimal numeric <*> fromMinimal numeric
@@ -348,20 +386,18 @@ halt = token Halt "halt"
 jmp :: Minimal ()
 jmp = token Jmp "jmp"
 
-terminator :: Parser (Maybe Place)
-terminator = do
-  a <- fromMinimal $ halt $> return Nothing -|- jmp $> (Just <$> fromMinimal place)
-  a
+terminator :: StateT Context Parser (Maybe (STApp Place))
+terminator = join $ lift . fromMinimal $ halt $> return Nothing -|- jmp $> (Just <$> stApp place)
 
 block :: Parser (Maybe Block)
 block = do
   ms <- option label
   case ms of
     Nothing -> return Nothing
-    Just s -> do
-      fromMinimal code
-      e <- parseEnv
-      fromMinimal colon
+    Just s -> flip evalStateT [] $ do
+      lift $ fromMinimal code
+      e <- parseEnv False
+      lift $ fromMinimal colon
       is <- p
       mp <- terminator
       return $ Just $ Block s e is mp
@@ -397,3 +433,5 @@ parse i = case runParser program i of
 -- | Parses a program from 'String'.
 fromString :: String -> Either Error Program
 fromString s = first Lexer (runLexer lexer s) >>= parse
+
+type Context = [String]
