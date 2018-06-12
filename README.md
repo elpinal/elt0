@@ -14,6 +14,13 @@ ELT0 is a general-purpose typed assembly language.
 $ stack install
 ```
 
+## Features
+
+- Control-flow safety
+- Stack safety
+- Type safety
+- (Predicative) stack polymorphism
+
 ## Code example
 
 Write the following program to a file, say, `prod.elt0`.
