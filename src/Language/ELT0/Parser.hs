@@ -97,7 +97,7 @@ instance Applicative Parse where
   (Fail x y) <*> (Fail _ _) = Fail x y
 
 instance Functor Parser where
-  fmap f p = p { runParser = \xs -> first (fmap f) $ runParser p xs }
+  fmap f p = p { runParser = first (fmap f) . runParser p }
 
 instance Applicative Parser where
   pure x = Parser $ \xs -> (pure x, xs)
@@ -148,7 +148,7 @@ minimal p e = Minimal
 token :: Token -> String -> Minimal ()
 token t s = minimal f [s]
   where
-    f t0 = if t0 == t then return () else Nothing
+    f t0 = unless (t0 == t) Nothing
 
 label :: Minimal String
 label = minimal f ["label"]
@@ -322,14 +322,13 @@ parseEnv escape = do
   ms <- lift (option lBrack) ^> parseStack
   when escape $
     modify $ drop $ length xs
-  return $ Env
+  return Env
     { binding = xs
     , file = fromMaybe mempty mf
     , stack = fromMaybe mempty ms
     }
   where
-    f [] ys = ys
-    f (x : xs) ys = f xs $ x : ys
+    f xs ys = foldl (flip (:)) ys xs
 
 stArgs :: StateT Context Parser [Stack]
 stArgs = do
@@ -372,7 +371,7 @@ inst = do
   maybe (return Nothing) (fmap Just) ma
   where
     f t e = minimal (g t) [e]
-    g m0 (Mnem m) = if m == m0 then return () else Nothing
+    g m0 (Mnem m) = unless (m == m0) Nothing
     g _ _ =  Nothing
     fm = lift . fromMinimal
     rnnl = lift . rnn

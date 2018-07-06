@@ -151,7 +151,7 @@ satisfy f = Stream { uncons = g }
         then (return x, xs, updatePos x p)
         else (Nothing, x : xs, p)
 
-    updatePos '\n' = mapPosition $ (+ 1) *** (const 1)
+    updatePos '\n' = mapPosition $ (+ 1) *** const 1
     updatePos _    = mapPosition $ second (+ 1)
 
 char :: Stream (Maybe Char)

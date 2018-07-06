@@ -62,7 +62,7 @@ headMay [] = Nothing
 headMay (x : _) = Just x
 
 set :: Word8 -> Type -> Stack -> Either TypeError Stack
-set w t s = req w s >>= \(xs, ys) -> do
+set w t s = req w s >>= \(xs, ys) ->
   maybe (Left $ ShortStackZ w $ genericLength s) (f xs ys) $ headMay ys
     where
       f xs ys x
@@ -165,7 +165,7 @@ instance Typed Inst () where
   typeOf (Shl r n1 n2) = intBinOp r n1 n2
   typeOf (Shr r n1 n2) = intBinOp r n1 n2
   typeOf (If  r p)     = void $ guardInt r >> guardMatch p
-  typeOf (Salloc w)    = lift . modify $ mapStack (genericReplicate w (Nonsense) ++)
+  typeOf (Salloc w)    = lift . modify $ mapStack (genericReplicate w Nonsense ++)
   typeOf (Sfree w)     = sfree w
   typeOf (Sld r w)     = getStack >>= liftEither . nth w >>= insertFile r
   typeOf (Sst w o)     = set w <$> typeOf o <*> getStack >>= liftEither >>= putStack
@@ -295,13 +295,13 @@ instance Subst Env where
       i = i0 + length (binding e)
 
 instance Shift File where
-  shiftAbove c d f = Map.map (shiftAbove c d) f
+  shiftAbove c d = Map.map $ shiftAbove c d
 
 instance Subst File where
-  subst i s f = Map.map (subst i s) f
+  subst i s = Map.map $ subst i s
 
 instance Shift Stack where
-  shiftAbove c d s = map (shiftAbove c d) s
+  shiftAbove c d = map $ shiftAbove c d
 
 instance Subst Stack where
   subst i s = concatMap f
