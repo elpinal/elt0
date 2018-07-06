@@ -28,6 +28,7 @@ module Language.ELT0.Parser
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.Cont
 import Control.Monad.Trans.State.Lazy
 import Data.Bifunctor
 import Data.Functor
@@ -231,31 +232,28 @@ typ :: StateT Context Parser Type
 typ = join $ lift $ fromMinimal typeM
 
 parseFile :: StateT Context Parser File
-parseFile = do
-  e <- row1 >>= p
-  lift $ fromMinimal rBrace
-  return e
+parseFile = rows <* lift (fromMinimal rBrace)
+
+-- TODO: detect duplicates
+rows :: StateT Context Parser File
+rows = evalContT $ do
+  mr <- liftParser $ option register
+  r <- mr !? Map.empty
+  liftParser $ fromMinimal colon
+  lift typ >>= f . Map.singleton r
   where
-    rows = do
-      m <- lift $ option comma
-      case m of
-        Just () -> (:) <$> row <*> rows
-        Nothing -> return []
+    f m = do
+      x <- liftParser $ option comma
+      x !? m
+      p <- lift row
+      f $ uncurry Map.insert p m
 
-    p Nothing = return mempty
-    p (Just x) = do
-      xs <- rows
-      return $ Map.fromList $ x : xs
+liftParser :: Parser a -> ContT b (StateT c Parser) a
+liftParser = lift . lift
 
-row1 :: StateT Context Parser (Maybe (Reg, Type))
-row1 = do
-  mr <- lift $ option register
-  case mr of
-    Nothing -> return Nothing
-    Just r -> do
-      lift $ fromMinimal colon
-      t <- typ
-      return $ Just (r, t)
+(!?) :: Monad m => Maybe a -> r -> ContT r m a
+Nothing !? x = ContT $ const $ return x
+Just x !? _ = ContT ($ x)
 
 row :: StateT Context Parser (Reg, Type)
 row = do
