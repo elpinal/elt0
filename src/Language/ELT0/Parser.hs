@@ -130,6 +130,15 @@ fromMinimal m = Parser $ first f . decons
         Other1 -> Fail mt $ expected m
         Parsed1 x -> Parsed x
 
+withPosition :: Minimal a -> Parser (a, Position)
+withPosition m = Parser $ first f . decons
+  where
+    f Nothing = Fail Nothing $ expected m
+    f mt @ (Just (t, p)) =
+      case runMinimal m t of
+        Other1 -> Fail mt $ expected m
+        Parsed1 x -> Parsed (x, p)
+
 option :: Minimal a -> Parser (Maybe a)
 option m = Parser $ f . decons
   where
@@ -234,7 +243,6 @@ typ = join $ lift $ fromMinimal typeM
 parseFile :: StateT Context Parser File
 parseFile = rows <* lift (fromMinimal rBrace)
 
--- TODO: detect duplicates
 rows :: StateT Context Parser File
 rows = evalContT $ do
   mr <- liftParser $ option register
@@ -242,11 +250,19 @@ rows = evalContT $ do
   liftParser $ fromMinimal colon
   lift typ >>= f . Map.singleton r
   where
+    f :: File -> ContT File (StateT Context Parser) File
     f m = do
       x <- liftParser $ option comma
       x !? m
-      p <- lift row
-      f $ uncurry Map.insert p m
+      (r, p, t) <- lift row
+      if r `Map.member` m
+        then err r (reg r, p) >>= f
+        else f (Map.insert r t m)
+
+    err :: Reg -> TokenP -> ContT File (StateT Context Parser) File
+    err r t = liftParser $ Parser $ \xs -> (Fail (Just t) ["register distinct from at least " ++ display r], xs)
+
+    reg (Reg w) = RegToken w
 
 liftParser :: Parser a -> ContT b (StateT c Parser) a
 liftParser = lift . lift
@@ -255,12 +271,12 @@ liftParser = lift . lift
 Nothing !? x = ContT $ const $ return x
 Just x !? _ = ContT ($ x)
 
-row :: StateT Context Parser (Reg, Type)
+row :: StateT Context Parser (Reg, Position, Type)
 row = do
-  r <- lift $ fromMinimal register
+  (r, p) <- lift $ withPosition register
   lift $ fromMinimal colon
   t <- typ
-  return (r, t)
+  return (r, p, t)
 
 parseStack :: StateT Context Parser Stack
 parseStack = (slot1 >>= p) <* lift (fromMinimal rBrack)
